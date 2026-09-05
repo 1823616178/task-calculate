@@ -1,0 +1,95 @@
+@use "sass:map";
+@use "./_variables.scss" as *;
+
+$tc-breakpoints: (sm: $bp-sm, md: $bp-md, lg: $bp-lg);
+
+// 卡片容器：可传内边距；$hoverable 开启悬停抬升
+@mixin card($padding: $spacing, $hoverable: false) {
+  background: $color-card-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-card;
+  padding: $padding;
+
+  @if $hoverable {
+    transition: box-shadow $dur-base $ease-out, transform $dur-base $ease-out;
+
+    &:hover {
+      @include elevate(2);
+      transform: translateY(-2px);
+    }
+  }
+}
+
+// 层级阴影：1=卡片，2=浮层（取值来自 global.scss 成对声明的 --tc-shadow-*）
+@mixin elevate($level: 1) {
+  @if $level == 2 {
+    box-shadow: var(--tc-shadow-2);
+  } @else {
+    box-shadow: var(--tc-shadow-1);
+  }
+}
+
+// 键盘焦点环：仅 :focus-visible 生效，鼠标点击不出现
+@mixin focus-ring($width: 2px, $offset: 2px) {
+  &:focus-visible {
+    outline: $width solid var(--tc-focus-ring);
+    outline-offset: $offset;
+  }
+}
+
+// 单行截断
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 细滚动条（暗色下同样可读）
+@mixin scrollbar($size: 8px) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--tc-border) transparent;
+
+  &::-webkit-scrollbar {
+    width: $size;
+    height: $size;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--tc-border);
+    border-radius: $radius-pill;
+
+    &:hover {
+      background: var(--tc-text-secondary);
+    }
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+// 断点向下（窄于断点生效）
+@mixin down($name) {
+  @media (max-width: #{map.get($tc-breakpoints, $name) - 1}) {
+    @content;
+  }
+}
+
+// 断点向上（不窄于断点生效）
+@mixin up($name) {
+  @media (min-width: #{map.get($tc-breakpoints, $name)}) {
+    @content;
+  }
+}
+
+// 向下别名（兼容习惯写法 respond-to('md') = 窄于 md）
+@mixin respond-to($name) {
+  @include down($name) {
+    @content;
+  }
+}
+
+// 数字列对齐（等宽数字避免跳动）
+@mixin tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

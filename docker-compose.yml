@@ -1,0 +1,44 @@
+services:
+  emqx:
+    image: emqx/emqx:5.8
+    container_name: task-calculate-emqx
+    restart: unless-stopped
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: public
+    ports:
+      - "${MQTT_PORT:-1883}:1883"    # MQTT TCP（8883/SSL、8083/WS 端口未使用，不映射到宿主机）
+      - "${EMQX_DASHBOARD_PORT:-18083}:18083"  # Dashboard
+    volumes:
+      - emqx_data:/opt/emqx/data
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  app:
+    build: .
+    container_name: task-calculate-app
+    restart: unless-stopped
+    depends_on:
+      emqx:
+        condition: service_healthy
+    environment:
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-48980}
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-task_calculate}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      MQTT_URL: mqtt://emqx:1883
+      RETENTION_DAYS: ${RETENTION_DAYS:-0}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${PORT:-48980}:${PORT:-48980}"
+
+volumes:
+  emqx_data:

@@ -1,0 +1,65 @@
+// 状态色 / 基础色：指向 CSS 自定义属性（见 global.scss 的 :root 与 html[data-theme='dark']），
+// 支持运行时暗色切换；需要半透明底色时使用 --tc-*-soft 变量，勿对 var() 颜色做 SCSS rgba() 运算。
+$color-normal: var(--tc-normal);
+$color-warning: var(--tc-warning);
+$color-alarm: var(--tc-alarm);
+$color-none: var(--tc-none);
+
+$color-bg: var(--tc-bg);
+$color-card-bg: var(--tc-card-bg);
+$color-border: var(--tc-border);
+$color-text: var(--tc-text);
+$color-text-secondary: var(--tc-text-secondary);
+$color-primary: var(--tc-primary);
+$color-primary-dark: var(--tc-primary-dark);
+$color-danger: var(--tc-danger);
+
+// ---- 间距（4 的倍数）----
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 24px;
+$space-6: 32px;
+$space-8: 48px;
+
+// ---- 圆角 ----
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 10px;
+$radius-xl: 14px;
+$radius-pill: 999px;
+
+// ---- 字号 / 行高 ----
+$font-xs: 12px;
+$font-sm: 13px;
+$font-base: 14px;
+$font-lg: 16px;
+$font-xl: 20px;
+$font-2xl: 28px;
+
+// ---- 控件高度（统一输入框与按钮的视觉基线）----
+$control-sm: 28px;
+$control-md: 34px;
+$control-lg: 40px;
+
+// ---- 层级 ----
+$z-dropdown: 100;
+$z-sticky: 200;
+$z-mask: 900;
+$z-modal: 1000;
+$z-toast: 1100;
+
+// ---- 动效 ----
+$dur-fast: 120ms;
+$dur-base: 200ms;
+$ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+// ---- 断点 ----
+$bp-sm: 640px;
+$bp-md: 960px;
+$bp-lg: 1280px;
+
+// 兼容旧命名（历史页面逐步迁移后可移除）
+$radius-card: 8px;
+$spacing: $space-4;

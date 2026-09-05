@@ -1,0 +1,37 @@
+{
+  "name": "task-calculate",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "seed": "tsx scripts/seed.ts",
+    "demo": "tsx scripts/demo-publish.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^1.0.2",
+    "bcryptjs": "^3.0.3",
+    "echarts": "^6.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mqtt": "^5.15.2",
+    "mysql2": "^3.24.2",
+    "nodemailer": "^9.0.5",
+    "nuxt": "^4.5.2",
+    "pinia": "^4.0.3",
+    "typeorm": "^1.1.0",
+    "vue": "^3.5.41",
+    "vue-router": "^5.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/nodemailer": "^8.0.1",
+    "sass": "^1.103.1",
+    "tsx": "^4.23.12",
+    "vitest": "^4.1.11"
+  }
+}
