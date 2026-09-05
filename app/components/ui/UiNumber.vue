@@ -49,7 +49,7 @@ const value = computed(() => (props.modelValue ?? '') as string)
 function onInput(e: Event) {
   const el = e.target as HTMLInputElement
   // 仅允许 - . 与数字，且只保留第一个负号/小数点
-  let v = el.value.replace(/[^\d.\-]/g, '')
+  let v = el.value.replace(/[^\d.-]/g, '')
   const parts = v.split('.')
   if (parts.length > 2) v = `${parts[0]}.${parts.slice(1).join('')}`
   const negIdx = v.indexOf('-', 1)

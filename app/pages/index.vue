@@ -138,7 +138,8 @@
 </template>
 
 <script setup lang="ts">
-import type { SystemWithMetrics, MetricStatus } from '../types'
+import type { SystemWithMetrics } from '../types'
+import type { MetricStatus } from '../../shared/types'
 
 const auth = useAuthStore()
 const dashboard = useDashboardStore()
@@ -148,7 +149,9 @@ const STATUS_ORDER: Record<MetricStatus, number> = { alarm: 3, warning: 2, norma
 function worstStatus(sys: SystemWithMetrics): MetricStatus {
   let worst: MetricStatus = 'none'
   for (const m of sys.metrics) {
-    if (STATUS_ORDER[m.lastStatus] > STATUS_ORDER[worst]) worst = m.lastStatus
+    const next = STATUS_ORDER[m.lastStatus]
+    const cur = STATUS_ORDER[worst]
+    if (next !== undefined && cur !== undefined && next > cur) worst = m.lastStatus
   }
   return worst
 }

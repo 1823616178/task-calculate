@@ -1,6 +1,6 @@
 import { EntitySchema } from 'typeorm'
 import type { SystemEntity } from './System'
-import type { MetricStatus } from '../../shared/types'
+import type { MetricStatus } from '../../../shared/types'
 
 export interface MetricEntity {
   id: number

@@ -1,6 +1,7 @@
 import { connect } from 'mqtt'
 import type { MqttClient } from 'mqtt'
 import { ingestData, IngestError } from './ingestService'
+import { resolveApiKey } from '../utils/apiKey'
 import { createSemaphore } from '../utils/semaphore'
 
 let client: MqttClient | null = null
@@ -25,8 +26,10 @@ export function stopMqttSubscriber(): void {
 /**
  * MQTT 接收通道：常驻订阅 EMQX，收到消息后进统一管道。
  * 主题格式：
- *   metric/{systemCode}/{metricCode}  payload 为 {"value": 87.5, "timestamp": "可选"}
- *   ingest                            payload 为完整报文 {"systemCode","metricCode","value","timestamp"?}
+ *   metric/{systemCode}/{metricCode}  payload 为 {"apiKey":"...","value":87.5,"timestamp":"可选"}
+ *   ingest                            payload 为 {"apiKey":"...","systemCode","metricCode","value","timestamp"?}
+ * payload 必须携带有效 ApiKey（与 HTTP/WS 通道一致），据此完成系统绑定隔离：
+ * 通道内以 ApiKey 绑定的 systemId 校验 topic/payload 中的 systemCode，防止向任意系统写数据。
  * 断线自动重连（mqtt.js reconnectPeriod），坏消息只记日志不影响后续消息。
  */
 export function startMqttSubscriber(): void {
@@ -80,17 +83,32 @@ export function startMqttSubscriber(): void {
         }
 
         try {
+          // ApiKey 系统隔离：与 HTTP/WS 通道一致，凭 payload 中的 apiKey 解析出绑定系统
+          const apiKeyField = typeof raw === 'object' && raw !== null
+            ? (raw as Record<string, unknown>).apiKey
+            : undefined
+          const apiKey = await resolveApiKey(typeof apiKeyField === 'string' ? apiKeyField : undefined)
+          if (!apiKey) {
+            console.warn(`[mqtt] missing or invalid api key on ${topic}`)
+            return
+          }
+
           let payload: unknown = raw
           const parts = topic.split('/')
           if (parts[0] === 'metric' && parts.length === 3) {
-            // 从主题补全 code，payload 中的同名字段优先
+            // 从主题补全 code；payload 中的同名字段优先（越权仍会被 expectedSystemId 拦截）
             payload = {
               systemCode: parts[1],
               metricCode: parts[2],
               ...(typeof raw === 'object' && raw !== null ? raw : { value: raw }),
             }
           }
-          const result = await ingestData(payload, 'mqtt')
+          // 摘除 apiKey，避免凭证明文进入存储/广播
+          if (typeof payload === 'object' && payload !== null && 'apiKey' in payload) {
+            const { apiKey: _omit, ...rest } = payload as Record<string, unknown>
+            payload = rest
+          }
+          const result = await ingestData(payload, 'mqtt', { expectedSystemId: apiKey.systemId })
           console.log(`[mqtt] ingested ${topic} -> status=${result.status} recordId=${result.recordId}`)
         }
         catch (err) {

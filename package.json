@@ -10,7 +10,9 @@
     "postinstall": "nuxt prepare",
     "seed": "tsx scripts/seed.ts",
     "demo": "tsx scripts/demo-publish.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "nuxt typecheck",
+    "lint": "oxlint app server scripts shared tests"
   },
   "dependencies": {
     "@pinia/nuxt": "^1.0.2",
@@ -30,8 +32,11 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
     "@types/nodemailer": "^8.0.1",
+    "oxlint": "^1.81.0",
     "sass": "^1.103.1",
     "tsx": "^4.23.12",
-    "vitest": "^4.1.11"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "vue-tsc": "^3.3.11"
   }
 }

@@ -29,8 +29,7 @@
 
           <UiField label="单位">
             <UiInput v-model="form.unit" placeholder="可选，如 ℃ / MPa / %" />
-          </UiField>
-        </div>
+          </UiField>        </div>
       </div>
 
       <div class="container_metricFormModal_group">
@@ -40,7 +39,7 @@
         </p>
         <div class="container_metricFormModal_grid container_metricFormModal_thresholds">
           <UiField label="预警下限">
-            <UiNumber v-model="form.warnMin" unit="" placeholder="-∞" :unit="undefined" />
+            <UiNumber v-model="form.warnMin" placeholder="-∞" />
           </UiField>
           <UiField label="预警上限">
             <UiNumber v-model="form.warnMax" placeholder="+∞" />
@@ -184,8 +183,8 @@ const rangeBar = computed<{ visible: boolean, segments: Array<{ kind: string, we
   const weight = (a: number, b: number) => Math.max(0.02, Math.log10(Math.max(b - a, 0.001)) + 3)
 
   const segments: Array<{ kind: string, weight: number, label?: string, title?: string }> = []
-  if (lo < aMin) segments.push({ kind: 'normal', weight: weight(lo, aMin), label: '正常', title: '正常区间' })
-  if (wMin !== null && lo < wMin) segments.push({ kind: 'alarm', weight: weight(aMin, wMin), label: '告警', title: '告警区间（低侧）' })
+  if (aMin !== null && lo < aMin) segments.push({ kind: 'normal', weight: weight(lo, aMin), label: '正常', title: '正常区间' })
+  if (wMin !== null && aMin !== null && lo < wMin) segments.push({ kind: 'alarm', weight: weight(aMin, wMin), label: '告警', title: '告警区间（低侧）' })
 
   const zoneStart = wMin !== null ? wMin : aMin
   const zoneEnd = wMax !== null ? wMax : aMax
@@ -194,7 +193,7 @@ const rangeBar = computed<{ visible: boolean, segments: Array<{ kind: string, we
   }
 
   if (wMax !== null && hi > wMax) segments.push({ kind: 'alarm', weight: weight(wMax, hi), label: '告警', title: '告警区间（高侧）' })
-  if (hi > aMax) segments.push({ kind: 'normal', weight: weight(hi, hi), label: '', title: '' })
+  if (aMax !== null && hi > aMax) segments.push({ kind: 'normal', weight: weight(aMax, hi), label: '', title: '' })
 
   const visibleSegs = segments.filter((s) => s.weight > 0.03)
   return { visible: visibleSegs.length > 0, segments: visibleSegs }

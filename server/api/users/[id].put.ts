@@ -43,6 +43,6 @@ export default defineEventHandler(async (event) => {
   if (data.role !== undefined) user.role = data.role
   if (data.enabled !== undefined) user.enabled = data.enabled
   await repo.save(user)
-  recordAudit(admin, 'user.update', user.username, { role: user.role, enabled: user.enabled, passwordReset: data.password !== undefined })
+  recordAudit(current, 'user.update', user.username, { role: user.role, enabled: user.enabled, passwordReset: data.password !== undefined })
   return { user: { id: user.id, username: user.username, role: user.role, enabled: user.enabled } }
 })

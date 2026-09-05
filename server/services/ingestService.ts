@@ -4,6 +4,7 @@ import type { MetricEntity } from '../database/entities'
 import type { IngestChannel, MetricStatus, MetricUpdateEvent } from '../../shared/types'
 import { firstZodMessage, ingestSchema } from '../utils/validation'
 import { stringifyPayload } from '../utils/payload'
+import { withLock } from '../utils/locks'
 import { evaluateStatus } from './statusService'
 import { broadcastMetricUpdate } from './broadcastService'
 import { dispatchAlertNotifications } from './alertingService'
@@ -122,36 +123,58 @@ export async function ingestData(raw: unknown, channel: IngestChannel, options: 
   }
 
   const metric = await resolveMetric(systemCode, metricCode)
-  const prevStatus = metric.lastStatus
   const status = evaluateStatus(value, metric)
 
   const ds = await initDataSource()
   const payload = stringifyPayload(raw)
-  // 记录写入与 metrics.last_* 回写放在同一事务，避免中途失败造成两表不一致
-  const record = await ds.transaction(async (em) => {
-    const recordRepo = em.getRepository(MetricRecordSchema)
-    const saved = await recordRepo.save(
-      recordRepo.create({
-        metricId: metric.id,
-        value,
-        status,
-        channel,
-        payload,
-        reportedAt,
-      }),
-    )
-    await em.getRepository(MetricSchema).update(metric.id, {
-      lastValue: value,
-      lastStatus: status,
-      lastReportedAt: reportedAt,
+
+  // 按指标维度串行化：并发/乱序上报时，事务内读取最新的 last_* 作为跃迁判定基准，
+  // 且 last_* 仅在 reportedAt 不早于已存值时更新，避免旧报文覆盖最新状态。
+  const { prevStatus, isLatest, recordId } = await withLock(`metric:${metric.id}`, async () => {
+    return ds.transaction(async (em) => {
+      // 事务内锁定指标行并读取真实最新状态（不依赖缓存快照）
+      const metricRepo = em.getRepository(MetricSchema)
+      const current = await metricRepo.findOne({
+        where: { id: metric.id },
+        lock: { mode: 'pessimistic_write' },
+      })
+      const dbLastReportedAt = current?.lastReportedAt ?? null
+      const isLatest = dbLastReportedAt === null || reportedAt.getTime() >= dbLastReportedAt.getTime()
+      const prevStatus: MetricStatus = current?.lastStatus ?? metric.lastStatus
+
+      const recordRepo = em.getRepository(MetricRecordSchema)
+      const saved = await recordRepo.save(
+        recordRepo.create({
+          metricId: metric.id,
+          value,
+          status,
+          channel,
+          payload,
+          reportedAt,
+        }),
+      )
+      if (isLatest) {
+        await metricRepo.update(metric.id, {
+          lastValue: value,
+          lastStatus: status,
+          lastReportedAt: reportedAt,
+        })
+      }
+      return { prevStatus, isLatest, recordId: Number(saved.id) }
     })
-    return saved
   })
 
-  // 同步缓存中的 last_*（阈值字段不变，缓存仍有效）
-  metric.lastValue = value
-  metric.lastStatus = status
-  metric.lastReportedAt = reportedAt
+  // 同步缓存中的 last_*（阈值字段不变，缓存仍有效）；过期报文不回写
+  if (isLatest) {
+    metric.lastValue = value
+    metric.lastStatus = status
+    metric.lastReportedAt = reportedAt
+  }
+
+  // 过期报文不广播、不触发告警，避免看板回滚与告警乱序/重复
+  if (!isLatest) {
+    return { recordId, status }
+  }
 
   const event: MetricUpdateEvent = {
     type: 'metric.update',
@@ -181,5 +204,5 @@ export async function ingestData(raw: unknown, channel: IngestChannel, options: 
     })
   }
 
-  return { recordId: Number(record.id), status }
+  return { recordId, status }
 }

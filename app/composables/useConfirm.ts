@@ -21,8 +21,9 @@ let seq = 0
 
 function settle(id: number, ok: boolean) {
   const i = queue.findIndex(item => item.id === id)
-  if (i < 0) return
-  queue[i].resolve(ok)
+  const item = i >= 0 ? queue[i] : undefined
+  if (!item) return
+  item.resolve(ok)
   queue.splice(i, 1)
 }
 

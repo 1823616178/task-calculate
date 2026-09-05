@@ -6,9 +6,9 @@ export function pickWindowSeconds(
   maxPoints = 240,
   steps: readonly number[] = WINDOW_STEPS_SECONDS,
 ): number {
-  if (spanSeconds <= 0) return steps[0]
+  if (spanSeconds <= 0) return steps[0] ?? 60
   for (const step of steps) {
     if (Math.ceil(spanSeconds / step) <= maxPoints) return step
   }
-  return steps[steps.length - 1]
+  return steps[steps.length - 1] ?? 86_400
 }

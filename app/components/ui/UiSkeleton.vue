@@ -24,7 +24,7 @@ const style = computed(() => {
     s.width = s.width ?? '100%'
     s.height = s.height ?? '12px'
   }
-  if (props.variant === 'circle') s.height = s.width
+  if (props.variant === 'circle') s.height = s.width ?? '100%'
   return s
 })
 </script>

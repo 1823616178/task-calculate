@@ -45,7 +45,9 @@ function show(message: string, type: ToastType = 'info', duration: number = DEFA
   if (!import.meta.client || !message) return -1
   // 超出堆叠上限时移除最早的一条
   while (toasts.length >= MAX_STACK) {
-    dismiss(toasts[0].id)
+    const oldest = toasts[0]
+    if (!oldest) break
+    dismiss(oldest.id)
   }
   const id = ++seq
   toasts.push({ id, type, message })

@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       id: k.id,
       systemId: k.systemId,
       name: k.name,
-      maskedKey: maskApiKey(k.key),
+      maskedKey: maskApiKey(k.keyPrefix),
       enabled: k.enabled,
       lastUsedAt: k.lastUsedAt,
       createdAt: k.createdAt,

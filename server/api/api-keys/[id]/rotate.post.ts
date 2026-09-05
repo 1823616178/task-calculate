@@ -1,7 +1,7 @@
 import { initDataSource } from '../../../database/data-source'
 import { ApiKeySchema } from '../../../database/entities'
 import { requireAdmin } from '../../../utils/auth'
-import { generateApiKey } from '../../../utils/apiKeyGen'
+import { generateApiKey, hashApiKey } from '../../../utils/apiKeyGen'
 import { clearApiKeyCache } from '../../../utils/apiKey'
 import { recordAudit } from '../../../utils/audit'
 
@@ -20,9 +20,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'api key not found' })
   }
 
-  apiKey.key = generateApiKey()
+  const plainKey = generateApiKey()
+  apiKey.key = hashApiKey(plainKey)
+  apiKey.keyPrefix = plainKey.slice(0, 8)
   await repo.save(apiKey)
   clearApiKeyCache()
   recordAudit(admin, 'apiKey.rotate', `${apiKey.systemId}/${apiKey.name}`)
-  return { apiKey: { id: apiKey.id, key: apiKey.key } }
+  return { apiKey: { id: apiKey.id, key: plainKey } }
 })

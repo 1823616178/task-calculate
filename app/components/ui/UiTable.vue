@@ -45,7 +45,7 @@
               :style="colStyle(col)"
             >
               <slot :name="cellSlotName(col)" :row="row" :index="index">
-                {{ row[col.key] }}
+                {{ (row as Row)[col.key] }}
               </slot>
             </td>
           </tr>
@@ -55,11 +55,12 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="RowT extends object">
 // 配置化表格：
 // - loading → 骨架行；空态插槽（补齐 systems 页缺失的空态）
 // - 表头 sticky（默认偏移为顶栏高度）
 // - 窄屏自动包进横向滚动容器 + 右缘阴影提示
+// - 泛型行类型：插槽内的 row 保持调用方的 DTO 类型
 export interface UiColumn {
   key: string
   label: string
@@ -73,13 +74,13 @@ type Row = Record<string, unknown>
 
 const props = withDefaults(defineProps<{
   columns: UiColumn[]
-  rows: Row[]
+  rows: RowT[]
   rowKey?: string
   loading?: boolean
   emptyText?: string
   skeletonRows?: number | string
   /** 按行追加 class（如禁用行降透明度） */
-  rowClass?: (row: Row, index: number) => string
+  rowClass?: (row: RowT, index: number) => string
 }>(), {
   rowKey: 'id',
   emptyText: '暂无数据',
@@ -88,9 +89,9 @@ const props = withDefaults(defineProps<{
 
 const skeletonCount = computed(() => Math.max(1, Number(props.skeletonRows) || 5))
 
-function rowKeyOf(row: Row): string | number {
+function rowKeyOf(row: RowT): string | number {
   const key = props.rowKey
-  const value = row[key]
+  const value: unknown = (row as Row)[key]
   return typeof value === 'number' || typeof value === 'string'
     ? value
     : JSON.stringify(row)

@@ -59,6 +59,11 @@ export function trapTabKey(event: KeyboardEvent, container: HTMLElement | null):
   }
   const first = items[0]
   const last = items[items.length - 1]
+  if (!first || !last) {
+    event.preventDefault()
+    container.focus()
+    return
+  }
   const active = document.activeElement as HTMLElement | null
 
   if (event.shiftKey && (active === first || !container.contains(active))) {

@@ -73,6 +73,7 @@ export default defineEventHandler(async (event) => {
       }
       sent += rows.length
       const lastRow = rows[rows.length - 1]
+      if (!lastRow) break
       lastReportedAt = lastRow.reportedAt instanceof Date ? lastRow.reportedAt : new Date(lastRow.reportedAt)
       lastId = Number(lastRow.id)
       if (rows.length < BATCH_SIZE) break

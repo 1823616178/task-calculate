@@ -1,6 +1,6 @@
 import { EntitySchema } from 'typeorm'
 import type { MetricEntity } from './Metric'
-import type { IngestChannel, MetricStatus } from '../../shared/types'
+import type { IngestChannel, MetricStatus } from '../../../shared/types'
 
 export interface MetricRecordEntity {
   id: number

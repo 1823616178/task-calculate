@@ -62,6 +62,43 @@ describe('metricInputSchema', () => {
   it('code 拒绝非法字符', () => {
     expect(metricInputSchema.safeParse({ ...base, code: 'te mp' }).success).toBe(false)
   })
+
+  it('拒绝倒置的预警/告警区间', () => {
+    expect(metricInputSchema.safeParse({ ...base, warnMin: 80, warnMax: 10 }).success).toBe(false)
+    expect(metricInputSchema.safeParse({ ...base, alarmMin: 90, alarmMax: 50 }).success).toBe(false)
+  })
+
+  it('拒绝预警区间超出告警区间（永远 warning/alarm 的配置）', () => {
+    expect(metricInputSchema.safeParse({ ...base, warnMin: 0, warnMax: 100, alarmMin: 20, alarmMax: 80 }).success).toBe(false)
+    expect(metricInputSchema.safeParse({ ...base, warnMin: 20, warnMax: 80, alarmMin: 0, alarmMax: 100 }).success).toBe(true)
+    // 单侧阈值同样受限
+    expect(metricInputSchema.safeParse({ ...base, warnMin: 5, alarmMin: 10 }).success).toBe(false)
+    expect(metricInputSchema.safeParse({ ...base, warnMax: 90, alarmMax: 80 }).success).toBe(false)
+  })
+
+  it('仅配置单边阈值时通过', () => {
+    expect(metricInputSchema.safeParse({ ...base, warnMin: 10 }).success).toBe(true)
+    expect(metricInputSchema.safeParse({ ...base, alarmMax: 90 }).success).toBe(true)
+  })
+})
+
+describe('dateRangeSchema（records / stats / export 的 from/to）', () => {
+  it('拒绝非 ISO 日期字符串', () => {
+    expect(recordsQuerySchema.safeParse({ from: 'yesterday' }).success).toBe(false)
+    expect(recordsQuerySchema.safeParse({ from: '2026-09-05 00:00:00' }).success).toBe(false)
+    expect(recordsQuerySchema.safeParse({ from: '2026-09-05T00:00:00Z' }).success).toBe(true)
+  })
+
+  it('from 晚于 to 拒绝', () => {
+    expect(recordsQuerySchema.safeParse({
+      from: '2026-09-05T10:00:00Z',
+      to: '2026-09-05T09:00:00Z',
+    }).success).toBe(false)
+    expect(recordsQuerySchema.safeParse({
+      from: '2026-09-05T09:00:00Z',
+      to: '2026-09-05T10:00:00Z',
+    }).success).toBe(true)
+  })
 })
 
 describe('loginSchema', () => {

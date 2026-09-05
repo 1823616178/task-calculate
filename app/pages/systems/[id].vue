@@ -37,7 +37,7 @@
     <section v-show="tab === 'metrics'" class="container_systemDetail_tabPanel">
       <UiTable
         :columns="metricColumns"
-        :rows="metricRows"
+        :rows="metrics"
         row-key="id"
         empty-text="暂无指标"
       >
@@ -92,8 +92,8 @@
       </UiTable>
     </section>
 
-    <!-- 趋势 -->
-    <section v-show="tab === 'trend'" class="container_systemDetail_tabPanel">
+    <!-- 趋势：懒加载，首屏不引入 ECharts（约 570KB chunk） -->
+    <section v-if="tab === 'trend'" class="container_systemDetail_tabPanel">
       <TrendChart :metrics="metrics" />
     </section>
 
@@ -144,13 +144,18 @@
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import type { MetricDto } from '../../types'
 import type { MetricStatus } from '../../../shared/types'
 import type { UiColumn } from '../../components/ui/UiTable.vue'
 
+// 覆盖 Nuxt 自动导入：仅在趋势页签首次渲染时才加载 TrendChart（及其内联的 ECharts）
+const TrendChart = defineAsyncComponent(() => import('../../components/TrendChart.vue'))
+
 const route = useRoute()
 const auth = useAuthStore()
 const dashboard = useDashboardStore()
+const toast = useToast()
 
 const systemId = Number(route.params.id)
 const system = computed(() => dashboard.systems.find((s) => s.id === systemId))
@@ -217,28 +222,7 @@ const retentionText = computed(() => {
 })
 
 // ---- 指标表格 ----
-
-interface MetricRow extends Record<string, unknown> {
-  id: number
-  code: string
-  name: string
-  unit: string | null
-  lastValue: number | null
-  lastStatus: MetricStatus
-  lastReportedAt: string | null
-}
-
-const metricRows = computed<MetricRow[]>(() =>
-  metrics.value.map((m) => ({
-    id: m.id,
-    code: m.code,
-    name: m.name,
-    unit: m.unit,
-    lastValue: m.lastValue,
-    lastStatus: m.lastStatus,
-    lastReportedAt: m.lastReportedAt,
-  })),
-)
+// 行对象直接使用 MetricDto（UiTable 泛型保持插槽内类型，无需再断言）
 
 const metricColumns = computed<UiColumn[]>(() => {
   const cols: UiColumn[] = [

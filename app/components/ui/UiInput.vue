@@ -63,7 +63,7 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   disabled?: boolean
   invalid?: boolean
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
   /** 右侧单位后缀（如 ℃ / 秒） */
   suffix?: string
 }>(), {
@@ -117,6 +117,12 @@ function onInput(e: Event) {
   &.container_uiInput_sm {
     height: $control-sm;
     font-size: $font-sm;
+  }
+
+  &_lg .container_uiInput_field,
+  &.container_uiInput_lg {
+    height: $control-lg;
+    font-size: $font-lg;
   }
 
   &_invalid {

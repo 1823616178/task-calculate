@@ -24,7 +24,7 @@ export function dashboardPeerCount(): number {
 export function broadcastMetricUpdate(event: MetricUpdateEvent): void {
   if (peers.size === 0) return
   const message = JSON.stringify(event)
-  for (const peer of [...peers]) {
+  for (const peer of peers) {
     try {
       peer.send(message)
     }

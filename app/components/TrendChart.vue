@@ -90,7 +90,7 @@ const RANGE_MS: Record<string, number> = {
 const SERIES_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ef4444']
 
 function colorFor(metricId: number): string {
-  return SERIES_COLORS[metricId % SERIES_COLORS.length]
+  return SERIES_COLORS[metricId % SERIES_COLORS.length] ?? SERIES_COLORS[0]!
 }
 
 const chartEl = ref<HTMLElement | null>(null)
@@ -102,6 +102,14 @@ const theme = useTheme()
 // 导致 onMounted 里 `window.addEventListener('resize')` 抛 TypeError、监听从未注册。
 // 现聚合窗口改名 bucket，并用 ResizeObserver 观察容器尺寸（覆盖标签页切换等场景）。
 const selected = ref<Set<number>>(new Set(props.metrics.slice(0, 3).map((m) => m.id)))
+// 首屏指标数据异步到达后自动选中前三项（仅一次，用户手动清空后不再干预）
+let autoSelected = props.metrics.length > 0
+watch(() => props.metrics, (metrics) => {
+  if (!autoSelected && metrics.length > 0) {
+    autoSelected = true
+    selected.value = new Set(metrics.slice(0, 3).map(m => m.id))
+  }
+})
 const range = ref<'1h' | '6h' | '24h' | '7d'>('24h')
 const bucket = ref<'auto' | '1m' | '5m' | '15m' | '1h' | '1d'>('auto')
 const loading = ref(false)
@@ -165,7 +173,11 @@ function toggleMetric(id: number) {
   selected.value = next
 }
 
+// 请求序号：过滤慢请求竞态，只让最新一次 load() 的结果落地
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
   error.value = ''
   const ids = [...selected.value]
   if (ids.length === 0) {
@@ -175,7 +187,7 @@ async function load() {
   loading.value = true
   try {
     const to = Date.now()
-    const from = to - RANGE_MS[range.value]
+    const from = to - (RANGE_MS[range.value] ?? RANGE_MS['24h']!)
     const results = await Promise.all(
       ids.map(async (metricId) => {
         const metric = props.metrics.find((m) => m.id === metricId)
@@ -188,14 +200,16 @@ async function load() {
         return { metric, ...res }
       }),
     )
+    if (seq !== loadSeq) return
     lastResults = results.filter((r) => r.metric)
     render(lastResults)
   } catch (err) {
+    if (seq !== loadSeq) return
     const e = err as { data?: { statusMessage?: string, message?: string } }
     error.value = errorMessage(e, '加载趋势数据失败')
     hasData.value = false
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -216,6 +230,15 @@ function formatTick(iso: string, windowSeconds: number): string {
   return hm
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('\'', '&#39;')
+}
+
 function render(results: SeriesResult[]) {
   if (!chartEl.value) return
   if (!chart) {
@@ -224,14 +247,14 @@ function render(results: SeriesResult[]) {
 
   const t = chartTheme.value
   const windowSeconds = results[0]?.windowSeconds ?? 300
-  // x 轴取所有序列时间点的并集（各指标数据可能不齐）
-  const ticks = [...new Set(results.flatMap(r => r.points.map(p => p.t)))].sort()
-  const tickLabels = new Map(ticks.map(tt => [tt, formatTick(tt, windowSeconds)]))
+  // x 轴使用 time 类型：刻度与数据共用原始时间戳，避免 category 轴按格式化标签匹配造成的错位
+  const hasAnyPoint = results.some(r => r.points.length > 0)
 
   const series: Record<string, unknown>[] = []
   results.forEach(({ metric, points }, idx) => {
     if (!metric) return
     const color = colorFor(metric.id)
+    const timeValue = (p: { t: string }): number => new Date(p.t).getTime()
 
     // 最小-最大区间带：stack 底层 + 差值半透明面积
     if (points.length > 0) {
@@ -239,7 +262,7 @@ function render(results: SeriesResult[]) {
         name: `${metric.name}-band-base`,
         type: 'line',
         stack: `band_${idx}`,
-        data: points.map(p => [p.t as never as number, p.min]),
+        data: points.map(p => [timeValue(p), p.min] as const),
         lineStyle: { opacity: 0 },
         symbol: 'none',
         silent: true,
@@ -250,7 +273,7 @@ function render(results: SeriesResult[]) {
         name: `${metric.name}-band`,
         type: 'line',
         stack: `band_${idx}`,
-        data: points.map(p => [p.t as never as number, Math.max(0, p.max - p.min)]),
+        data: points.map(p => [timeValue(p), Math.max(0, p.max - p.min)] as const),
         areaStyle: { color, opacity: 0.08 },
         lineStyle: { opacity: 0 },
         symbol: 'none',
@@ -267,11 +290,7 @@ function render(results: SeriesResult[]) {
       connectNulls: true,
       itemStyle: { color },
       lineStyle: { color, width: 2 },
-      data: points.map(p => [p.t as never as number, p.avg]),
-      tooltip: {
-        min: points.length > 0 ? Math.min(...points.map(p => p.min)) : '—',
-        max: points.length > 0 ? Math.max(...points.map(p => p.max)) : '—',
-      },
+      data: points.map(p => [timeValue(p), p.avg] as const),
     })
   })
 
@@ -292,24 +311,40 @@ function render(results: SeriesResult[]) {
       borderColor: t.splitLine,
       textStyle: { color: t.textColor, fontSize: 12 },
       formatter(params: unknown) {
-        const list = params as Array<{ seriesName?: string, value: [string, number] }>
+        const list = params as Array<{ seriesName?: string, value: [number, number], axisValue?: number }>
+        const hoverAt = list[0]?.value[0] ?? list[0]?.axisValue
         const lines: string[] = []
         for (const item of list) {
-          if (!item.seriesName || item.seriesName.endsWith('-band')) continue
-          const name = item.seriesName.replace(/-band-base$/, '')
+          // 只保留真实指标系列（排除 -band / -band-base 辅助系列）
+          const name = item.seriesName ?? ''
+          if (!results.some(r => r.metric?.name === name)) continue
           const src = results.find(r => r.metric?.name === name)
-          if (!src || src.points.length === 0) continue
-          const min = Math.min(...src.points.map(p => p.min))
-          const max = Math.max(...src.points.map(p => p.max))
-          lines.push(`${item.seriesName}：均值 ${item.value[1]}（最小 ${min} / 最大 ${max}）`)
+          const point = src?.points.find(p => new Date(p.t).getTime() === hoverAt)
+          if (!point) continue
+          // tooltip 显示当前 hover 桶的极值，而非整段数据全局极值
+          const label = `${escapeHtml(name)}：均值 ${point.avg}（最小 ${point.min} / 最大 ${point.max}）`
+          lines.push(label)
         }
-        return `${tickLabels.get(list[0]?.value[0] ?? '') ?? ''}${lines.length > 0 ? '<br/>' + lines.join('<br/>') : ''}`
+        const tick = hoverAt !== undefined ? formatTick(new Date(hoverAt).toISOString(), windowSeconds) : ''
+        return `${escapeHtml(tick)}${lines.length > 0 ? '<br/>' + lines.join('<br/>') : ''}`
       },
     },
     xAxis: {
-      type: 'category',
-      data: ticks.map(tt => tickLabels.get(tt) ?? tt),
-      axisLabel: { fontSize: 11, color: t.textColor },
+      type: 'time',
+      axisLabel: {
+        fontSize: 11,
+        color: t.textColor,
+        hideOverlap: true,
+        formatter: {
+          year: '{MM}-{dd}',
+          month: '{MM}-{dd}',
+          day: '{MM}-{dd}',
+          hour: '{HH}:{mm}',
+          minute: '{HH}:{mm}',
+          second: '{HH}:{mm}:{ss}',
+          millisecond: '{HH}:{mm}:{ss}',
+        } as never,
+      },
       axisLine: { lineStyle: { color: t.splitLine } },
     },
     yAxis: {
@@ -321,7 +356,7 @@ function render(results: SeriesResult[]) {
     series,
   }, { notMerge: true })
 
-  hasData.value = ticks.length > 0
+  hasData.value = hasAnyPoint
 }
 
 function exportPng() {

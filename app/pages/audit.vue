@@ -66,7 +66,7 @@
           type="button"
           class="container_audit_detailBtn"
           @click="openDetail(row)"
-        >{{ String(row.detailText ?? '') || '—' }}</button>
+        >{{ row.detail ? '查看' : '—' }}</button>
       </template>
     </UiTable>
 

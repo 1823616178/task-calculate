@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const guardKey = `${parsed.data.username.toLowerCase()}@${ip}`
   if (loginLocked(guardKey)) {
     const retryAfter = Math.max(1, Math.ceil(loginRetryAfterMs(guardKey) / 1000))
-    setHeader(event, 'retry-after', String(retryAfter))
+    setHeader(event, 'retry-after', retryAfter)
     throw createError({ statusCode: 429, statusMessage: 'too many attempts', message: '失败次数过多，请稍后再试' })
   }
 

@@ -1,6 +1,7 @@
 import { initDataSource } from '../database/data-source'
 import { ApiKeySchema } from '../database/entities'
 import type { ApiKeyEntity } from '../database/entities'
+import { hashApiKey } from './apiKeyGen'
 
 // 数据提交方凭 ApiKey 调用 HTTP / WS 接收通道；ApiKey 绑定到某个系统。
 // 短 TTL 缓存避免每次上报都查库；管理端禁用/删除最多 TTL 后生效。
@@ -34,7 +35,7 @@ export async function resolveApiKey(key: string | undefined): Promise<ApiKeyEnti
   }
 
   const ds = await initDataSource()
-  const found = await ds.getRepository(ApiKeySchema).findOne({ where: { key, enabled: true } })
+  const found = await ds.getRepository(ApiKeySchema).findOne({ where: { key: hashApiKey(key), enabled: true } })
   if (found) {
     cache.set(key, { apiKey: found, expiresAt: now + API_KEY_TTL_MS })
     touchLastUsed(found)

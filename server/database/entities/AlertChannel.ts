@@ -1,5 +1,5 @@
 import { EntitySchema } from 'typeorm'
-import type { AlertChannelType } from '../../shared/types'
+import type { AlertChannelType } from '../../../shared/types'
 
 export interface AlertChannelEntity {
   id: number

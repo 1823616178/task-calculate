@@ -57,8 +57,8 @@ const domain = computed<[number, number] | null>(() => {
   if (lows.length === 0 && highs.length === 0) return null
 
   // 单边界时构造对称范围，避免除零
-  let low = lows.length > 0 ? Math.min(...lows) : Math.min(...highs) - Math.max(1, Math.abs(...highs))
-  let high = highs.length > 0 ? Math.max(...highs) : Math.max(...lows) + Math.max(1, Math.abs(...lows))
+  let low = lows.length > 0 ? Math.min(...lows) : Math.min(...highs) - Math.max(1, ...highs.map(Math.abs))
+  let high = highs.length > 0 ? Math.max(...highs) : Math.max(...lows) + Math.max(1, ...lows.map(Math.abs))
   if (value !== null) {
     low = Math.min(low, props.value!)
     high = Math.max(high, props.value!)
@@ -83,6 +83,7 @@ const segments = computed<Seg[]>(() => {
   for (let i = 0; i < bounds.length - 1; i++) {
     const start = bounds[i]
     const end = bounds[i + 1]
+    if (start === undefined || end === undefined) continue
     let kind: Seg['kind'] = 'normal'
     if (props.alarmMin !== null && end <= props.alarmMin) kind = 'alarm'
     else if (props.alarmMax !== null && start >= props.alarmMax) kind = 'alarm'

@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs'
+import { randomBytes } from 'node:crypto'
 import { initDataSource } from '../server/database/data-source'
 import { ApiKeySchema, MetricSchema, SystemSchema, UserSchema } from '../server/database/entities'
+import { generateApiKey, hashApiKey } from '../server/utils/apiKeyGen'
 import { DEMO_API_KEY } from './const'
 
 try {
@@ -8,6 +10,14 @@ try {
 }
 catch {
   // .env 不存在时使用 data-source 内置默认值
+}
+
+// Seed 写入固定演示账号/ApiKey，仅允许开发模式；生产环境需显式 SEED_ALLOW=1，
+// 且改用随机密码与随机 ApiKey（仅打印一次）
+const isProd = process.env.NODE_ENV === 'production'
+if (isProd && process.env.SEED_ALLOW !== '1') {
+  console.error('refusing to seed in production without SEED_ALLOW=1')
+  process.exit(1)
 }
 
 async function main() {
@@ -20,10 +30,11 @@ async function main() {
   const userRepo = ds.getRepository(UserSchema)
   const admin = await userRepo.findOne({ where: { username: 'admin' } })
   if (!admin) {
+    const password = isProd ? randomBytes(9).toString('base64url') : 'admin123'
     await userRepo.save(
-      userRepo.create({ username: 'admin', passwordHash: bcrypt.hashSync('admin123', 10), role: 'admin' }),
+      userRepo.create({ username: 'admin', passwordHash: bcrypt.hashSync(password, 10), role: 'admin' }),
     )
-    console.log('created user: admin / admin123')
+    console.log(`created user: admin / ${password}${isProd ? '（请立即修改）' : ''}`)
   }
   else {
     console.log('user admin already exists, skipped')
@@ -53,10 +64,11 @@ async function main() {
   }
 
   const keyRepo = ds.getRepository(ApiKeySchema)
-  const existsKey = await keyRepo.findOne({ where: { key: DEMO_API_KEY } })
+  const demoKey = isProd ? generateApiKey() : DEMO_API_KEY
+  const existsKey = await keyRepo.findOne({ where: { key: hashApiKey(demoKey) } })
   if (!existsKey) {
-    await keyRepo.save(keyRepo.create({ systemId: line1.id, key: DEMO_API_KEY, name: '一号产线演示 Key', enabled: true }))
-    console.log(`created api key: ${DEMO_API_KEY}`)
+    await keyRepo.save(keyRepo.create({ systemId: line1.id, key: hashApiKey(demoKey), keyPrefix: demoKey.slice(0, 8), name: '一号产线演示 Key', enabled: true }))
+    console.log(`created api key: ${demoKey}${isProd ? '（仅本次打印）' : ''}`)
   }
 
   console.log('seed done')

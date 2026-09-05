@@ -1,6 +1,6 @@
 <template>
   <nav class="container_uiPagination" aria-label="分页">
-    <div v-if="pageSizes.length > 0" class="container_uiPagination_size">
+    <div v-if="(pageSizes ?? []).length > 0" class="container_uiPagination_size">
       <span class="container_uiPagination_sizeLabel">每页</span>
       <UiSelect
         :model-value="pageSize"
@@ -18,7 +18,7 @@
     </UiButton>
 
     <!-- 页码模式：totalPages 已知时展示数字页码 -->
-    <template v-if="totalPages > 0">
+    <template v-if="totalPages != null && totalPages > 0">
       <button
         v-for="p in visiblePages"
         :key="p"
@@ -40,7 +40,7 @@
       下一页
     </UiButton>
 
-    <template v-if="totalPages > 0 && total !== null">
+    <template v-if="totalPages != null && totalPages > 0 && total !== null">
       <span class="container_uiPagination_total">共 {{ total }} 条</span>
     </template>
   </nav>

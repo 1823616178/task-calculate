@@ -1,5 +1,7 @@
 # AI Credits Usage API
 
+> ⚠️ 归属说明：本文档来自另一个“AI 额度仪表盘”项目，与本仓库（task-calculate 数据检测汇总平台）无关，仅作参考存档。本仓库的接口文档见 README「接口一览」。
+
 本仪表盘把本机已登录的 Grok、Claude Code、Codex、Kimi Code、OpenCode Go 和 Antigravity（AGY）额度聚合成一个只读 HTTP 接口。其他项目应调用本接口，不要直接去读各 CLI 的凭据文件或会话目录。
 
 文档对照实现日期：2026-08-27。接口尚未带版本号。

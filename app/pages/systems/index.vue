@@ -97,8 +97,8 @@
 </template>
 
 <script setup lang="ts">
-import type { SystemWithMetrics } from '../types'
-import type { UiColumn } from '../components/ui/UiTable.vue'
+import type { SystemWithMetrics } from '../../types'
+import type { UiColumn } from '../../components/ui/UiTable.vue'
 
 const auth = useAuthStore()
 const dashboard = useDashboardStore()

@@ -2,7 +2,7 @@ import { initDataSource } from '../../database/data-source'
 import { ApiKeySchema, SystemSchema } from '../../database/entities'
 import { requireAdmin } from '../../utils/auth'
 import { firstZodMessage, apiKeyCreateSchema } from '../../utils/validation'
-import { generateApiKey } from '../../utils/apiKeyGen'
+import { generateApiKey, hashApiKey } from '../../utils/apiKeyGen'
 import { clearApiKeyCache } from '../../utils/apiKey'
 import { recordAudit } from '../../utils/audit'
 
@@ -21,15 +21,17 @@ export default defineEventHandler(async (event) => {
   }
 
   const repo = ds.getRepository(ApiKeySchema)
+  const plainKey = generateApiKey()
   const saved = await repo.save(
     repo.create({
       systemId: system.id,
-      key: generateApiKey(),
+      key: hashApiKey(plainKey),
+      keyPrefix: plainKey.slice(0, 8),
       name: parsed.data.name,
       enabled: true,
     }),
   )
   clearApiKeyCache()
   recordAudit(admin, 'apiKey.create', `${system.code}/${parsed.data.name}`)
-  return { apiKey: { id: saved.id, systemId: saved.systemId, name: saved.name, enabled: saved.enabled, key: saved.key } }
+  return { apiKey: { id: saved.id, systemId: saved.systemId, name: saved.name, enabled: saved.enabled, key: plainKey } }
 })

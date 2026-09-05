@@ -18,8 +18,8 @@
 ## 快速开始
 
 ```bash
-# 1. 启动 MySQL + EMQX
-docker compose up -d
+# 1. 启动 EMQX（docker compose 只包含 emqx + app 两个容器，MySQL 需自备）
+docker compose up -d emqx
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -34,10 +34,10 @@ npm run seed
 npm run dev
 ```
 
-打开 http://localhost:48980 ，登录 `admin / admin123`。
-
+> 前置要求：宿主机需有一个可用的 MySQL 8 实例，通过 `DB_HOST`/`DB_PORT`（默认 127.0.0.1:3307）连接。
 > 默认端口为 48980；若该端口被占用，Nuxt 会自动选择其他端口，以终端输出为准。
-> MySQL 容器映射在宿主机 **3307** 端口（宿机 3306 已被占用）；EMQX Dashboard 在 18083（admin/public）。
+> EMQX Dashboard 在 18083（admin/public），1883 默认仅绑定 127.0.0.1。
+> 开发环境启动后打开 http://localhost:48980 ，使用 seed 创建的 `admin / admin123` 登录。
 
 ## 数据接入
 
@@ -48,7 +48,7 @@ npm run dev
 ```
 
 - **HTTP**：`POST /api/ingest`，请求头 `X-Api-Key: <ApiKey>`
-- **MQTT**：发布到主题 `metric/{systemCode}/{metricCode}`（payload 可只带 `value`），或主题 `ingest`（payload 为完整报文）
+- **MQTT**：发布到主题 `metric/{systemCode}/{metricCode}` 或 `ingest`，payload 中必须携带 `"apiKey": "<ApiKey>"`（与服务端绑定系统隔离校验，例如 `{"apiKey":"...","value":87.5}`）
 - **WebSocket**：连接 `/ws/ingest`，首帧 `{"apiKey": "<ApiKey>"}` 认证，之后每帧一条报文
 
 演示 ApiKey（seed 创建）：`dk_line1_6f3a9c2e8b1d4f70`（绑定系统 `line1`）
@@ -65,9 +65,11 @@ npm run demo -- --loop    # 每 2 秒经 MQTT 发随机数据（看板演示）
 ```bash
 npm run dev       # 开发
 npm run build     # 生产构建
-npm run seed      # 迁移 + 种子数据（幂等）
+npm run seed      # 迁移 + 种子数据（幂等，生产环境需 SEED_ALLOW=1）
 npm run demo      # 联调发数脚本
 npm run test      # vitest 单测（阈值判定 / 报文校验）
+npm run lint      # oxlint
+npm run typecheck # nuxt typecheck
 ```
 
 ## 接口一览
@@ -137,7 +139,9 @@ tests/          vitest 单测
 - 启动顺序：先连数据库并跑迁移，失败即中止启动；MQTT 独立重连不阻塞服务；停机时释放连接池并断开 MQTT
 - 所有接收入口 zod 校验 + 兜底 try/catch，坏消息只记日志不影响其他消息
 - `synchronize: false`，schema 变更只走迁移
-- ingest 记录写入与最新值回写在同一事务；上报 payload 截断存储，防超大报文
+- ingest 记录写入与最新值回写在同一事务；同一指标按序串行处理，乱序/过期报文不覆盖 `last_*` 也不触发告警
+- 上报 payload 截断存储，防超大报文；HTTP / WS 通道与 MQTT 一致：请求体大小限制（64KB）、每 ApiKey 令牌桶限流、全局有界并发（溢出返回 429）
+- MQTT 通道与 HTTP/WS 一致要求 ApiKey，凭 payload 中的 apiKey 完成系统绑定隔离校验
 - 记录/指标/ApiKey 缓存 + 未知 code 负缓存（TTL），坏消息洪峰不打穿 DB
 - MQTT 消费经信号量限流（并发 20 / 队列 500），洪峰丢帧记日志而非拖垮服务
 - 登录按 用户名+IP 限流，连续失败锁定 15 分钟；用户可被管理员禁用（登录拦截，保护最后一个可用管理员）
@@ -151,7 +155,7 @@ tests/          vitest 单测
 ## 部署
 
 ```bash
-docker compose up -d --build   # MySQL + EMQX + app 三容器
+docker compose up -d --build   # EMQX + app 两容器（MySQL 由 DB_HOST 指向外部实例）
 ```
 
 - app 容器多阶段构建，健康检查走 `/api/health`；依赖注入 `depends_on: service_healthy`

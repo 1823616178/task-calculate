@@ -37,14 +37,14 @@ export const useRealtimeStore = defineStore('realtime', {
       }
       socket.onmessage = (event) => {
         try {
-          const msg = JSON.parse(String(event.data)) as MetricUpdateEvent & { code?: string }
+          const msg = JSON.parse(String(event.data)) as { type: string, code?: string, data?: MetricUpdateEvent['data'] }
           if (msg.type === 'error' && msg.code === 'unauthorized') {
             // 会话已过期：停止重连并回到登录页
             authFailed = true
             socket.close()
             return
           }
-          if (msg.type === 'metric.update') {
+          if (msg.type === 'metric.update' && msg.data) {
             useDashboardStore().applyMetricUpdate(msg.data)
           }
         }

@@ -52,7 +52,8 @@ export default defineEventHandler(async (event) => {
 
   const hasMore = list.length > pageSize
   if (hasMore) list = list.slice(0, pageSize)
-  const nextCursor = hasMore ? Number(list[list.length - 1].id) : null
+  const last = list[list.length - 1]
+  const nextCursor = hasMore && last ? Number(last.id) : null
 
   return { list, total, page, pageSize, nextCursor }
 })
