@@ -1,11 +1,11 @@
 import { initDataSource } from '../../../database/data-source'
-import { MetricSchema, SilenceRuleSchema } from '../../../database/entities'
-import { requireAdmin } from '../../../utils/auth'
+import { MetricSchema, SilenceRuleSchema, SystemSchema } from '../../../database/entities'
+import { requireAllSystems, requirePermission, requireSystemAccess } from '../../../utils/auth'
 import { firstZodMessage, silenceRuleSchema } from '../../../utils/validation'
 import { recordAudit } from '../../../utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'alerts:manage')
   const parsed = silenceRuleSchema.safeParse(await readBody(event))
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: firstZodMessage(parsed.error) })
@@ -22,6 +22,15 @@ export default defineEventHandler(async (event) => {
     if (data.systemId !== undefined && data.systemId !== null && data.systemId !== metric.systemId) {
       throw createError({ statusCode: 400, statusMessage: 'metricId 不属于该系统' })
     }
+    requireSystemAccess(admin, metric.systemId)
+  }
+  else if (data.systemId !== undefined && data.systemId !== null) {
+    const system = await ds.getRepository(SystemSchema).findOne({ where: { id: data.systemId } })
+    if (!system) throw createError({ statusCode: 404, statusMessage: 'system not found' })
+    requireSystemAccess(admin, system.id)
+  }
+  else {
+    requireAllSystems(admin)
   }
 
   const repo = ds.getRepository(SilenceRuleSchema)

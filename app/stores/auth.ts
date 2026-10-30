@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { AuthUser } from '../types'
+import type { ApiPermission } from '../../shared/types'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -8,6 +9,11 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isAdmin: (state) => state.user?.role === 'admin',
+    can: state => (permission: ApiPermission) => {
+      if (!state.user) return false
+      if (state.user.authType === 'user') return state.user.role === 'admin' || permission === 'data:read'
+      return state.user.permissions.includes(permission)
+    },
   },
   actions: {
     async login(username: string, password: string) {
@@ -18,6 +24,15 @@ export const useAuthStore = defineStore('auth', {
       this.user = res.user
       this.token = res.token
       // 认证统一走 httpOnly Cookie（含 WS 握手）；token 不再持久化到 localStorage，减少 XSS 暴露面
+    },
+
+    async loginWithApiKey(apiKey: string) {
+      const res = await $fetch<{ token: null, user: AuthUser }>('/api/auth/login', {
+        method: 'POST',
+        body: { apiKey },
+      })
+      this.user = res.user
+      this.token = ''
     },
 
     async logout() {

@@ -187,11 +187,14 @@ MQTT 侧有信号量（`semaphore`）限流，但 HTTP 与 WebSocket 接入没�
 
 ## 附：本次审查检查清单
 
-- [ ] P0-1 `server/api/users/[id].put.ts:46` 未定义变量 `admin`
-- [ ] P0-2 缺少 typecheck / lint，CI 未阻断类型错误
-- [ ] P0-3 ingest 并发与乱序破坏 `metrics.last_*`
-- [ ] P0-4 MQTT 通道未传 `expectedSystemId`
-- [ ] P0-5 健康检查假阳性（始终 200）
-- [ ] P1 JWT 默认密钥 / seed 固定口令 / ApiKey 明文 / 阈值与日期校验 / CSV 公式注入 / ingest 限流
-- [ ] P2 TrendChart 六项问题 + 570 KB chunk 懒加载
-- [ ] 文档：usage-api 归属、ui-refactor 归档、README 容器与端口、class 规范落地
+> 状态回填（2026-09-17）：问题已在 `5784474 问题修复` 及后续复查中处理。
+
+- [x] P0-1 `server/api/users/[id].put.ts:46` 未定义变量 `admin`
+- [x] P0-2 缺少 typecheck / lint，CI 未阻断类型错误
+- [x] P0-3 ingest 并发与乱序破坏 `metrics.last_*`（进程内锁 + 行锁 + reportedAt 比较，`tests/ingest.test.ts` 覆盖）
+- [x] P0-4 MQTT 通道未传 `expectedSystemId`（payload 须携带 apiKey）
+- [x] P0-5 健康检查假阳性（不健康返回 503）
+- [x] P1 JWT 默认密钥（生产缺密钥启动即中止，`server/plugins/00.env.ts`）/ seed 固定口令 / ApiKey 摘要化 / 阈值与日期校验 / CSV 公式注入 / ingest 限流（含请求体强制 Content-Length、按 IP 限流、无效 key 负缓存、WS 每帧复核 key）
+- [x] P2 TrendChart 六项问题 + ECharts 懒加载（复查另修：主题切换不重绘、负值区间带错位、清空选择竞态）
+- [x] 文档：usage-api 归属、ui-refactor 归档、README 容器与端口、class 规范落地（剩余个别 1–2px 细节与非梯度值）
+- [ ] 真实数据库下的 API 集成测试（当前为 DB mock 单测）

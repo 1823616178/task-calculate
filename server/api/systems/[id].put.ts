@@ -1,12 +1,12 @@
 import { initDataSource } from '../../database/data-source'
 import { SystemSchema } from '../../database/entities'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission, requireSystemAccess } from '../../utils/auth'
 import { firstZodMessage, systemInputSchema } from '../../utils/validation'
 import { recordAudit } from '../../utils/audit'
 
 // 更新系统（code 是提交方使用的标识，不允许修改）
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'systems:manage')
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'invalid id' })
@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
   if (!system) {
     throw createError({ statusCode: 404, statusMessage: 'system not found' })
   }
+  requireSystemAccess(admin, system.id)
 
   if (parsed.data.name !== undefined) system.name = parsed.data.name
   if (parsed.data.description !== undefined) system.description = parsed.data.description ?? null

@@ -50,10 +50,11 @@ withDefaults(defineProps<{
 .container_uiField_control {
   min-width: 0;
 
-  // 容器内的输入类控件默认占满宽度
-  > .container_uiInput,
-  > .container_uiSelect,
-  > .container_uiTextarea {
+  // 容器内的输入类控件默认占满宽度（控件来自插槽，scoped 样式须用 :slotted 才能命中）
+  > :slotted(.container_uiInput),
+  > :slotted(.container_uiSelect),
+  > :slotted(.container_uiTextarea),
+  > :slotted(.container_uiNumber) {
     width: 100%;
   }
 }

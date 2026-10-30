@@ -69,10 +69,19 @@ function toggle() {
   border-radius: $radius-pill;
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
-  transition: transform $dur-base $ease-out;
+  transition: transform $dur-slow $ease-spring, width $dur-base $ease-out, margin $dur-base $ease-out;
 }
 
 .container_uiSwitch_checked .container_uiSwitch_thumb {
   transform: translateX(16px);
+}
+
+// 按住时滑块拉长（iOS 风格的按压反馈）
+.container_uiSwitch:active:not(:disabled) .container_uiSwitch_thumb {
+  width: 20px;
+}
+
+.container_uiSwitch_checked:active:not(:disabled) .container_uiSwitch_thumb {
+  margin-left: -4px;
 }
 </style>

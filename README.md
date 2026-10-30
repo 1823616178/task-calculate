@@ -5,7 +5,7 @@
 ## 技术栈
 
 - 全栈 Nuxt 4（Nitro Node 服务端）+ TypeORM + MySQL 8
-- MQTT：EMQX 5（Docker），服务端 mqtt.js 常驻订阅（并发受信号量约束）
+- MQTT：EMQX 6.3（宿主机 apt/deb 安装为系统服务，单节点使用内置 Community License，无需许可证密钥；集群需商业许可），服务端 mqtt.js 常驻订阅（并发受信号量约束）
 - WebSocket：Nitro crossws（`/ws/ingest` 接收、`/ws/dashboard` 推送）
 - 告警：nodemailer（邮件）+ fetch（Webhook/钉钉加签/企微），规则级冷却 + 静默窗口
 - 趋势图表：ECharts（按需引入），数据源为窗口聚合统计 API
@@ -18,8 +18,9 @@
 ## 快速开始
 
 ```bash
-# 1. 启动 EMQX（docker compose 只包含 emqx + app 两个容器，MySQL 需自备）
-docker compose up -d emqx
+# 1. 安装并启动 EMQX（Ubuntu 24.04，deb 包见 https://www.emqx.com/en/downloads-and-install/enterprise?os=Ubuntu）
+sudo apt install -y ./emqx-enterprise-6.3.0-ubuntu24.04-amd64.deb
+sudo systemctl enable --now emqx
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -34,12 +35,16 @@ npm run seed
 npm run dev
 ```
 
-> 前置要求：宿主机需有一个可用的 MySQL 8 实例，通过 `DB_HOST`/`DB_PORT`（默认 127.0.0.1:3307）连接。
+> 前置要求：宿主机需有可用的 MySQL 8 与 EMQX 服务；MySQL，通过 `DB_HOST`/`DB_PORT`（默认 127.0.0.1:3307）连接。
 > 默认端口为 48980；若该端口被占用，Nuxt 会自动选择其他端口，以终端输出为准。
-> EMQX Dashboard 在 18083（admin/public），1883 默认仅绑定 127.0.0.1。
+> EMQX Dashboard 在 18083（初始 admin/public，首次登录请修改）。系统服务默认监听所有网卡的 1883，非本机设备无需接入时请用防火墙限制或开启 EMQX 认证。
 > 开发环境启动后打开 http://localhost:48980 ，使用 seed 创建的 `admin / admin123` 登录。
 
 ## 数据接入
+
+> 完整接入文档（报文规范、错误码、限流、各语言示例、管理 API、推送与 Webhook 格式）见 [doc/API.md](doc/API.md)。
+
+ApiKey 是全局凭证，可通过 `X-Api-Key` 调用已授权的读取、上报或管理接口，也可登录控制台并订阅 `/ws/dashboard`；`permissions` 控制能力，`systemIds/allSystems` 控制可访问系统。统一在顶部“ApiKey”页面生成和配置。
 
 三种通道报文一致：
 
@@ -48,10 +53,10 @@ npm run dev
 ```
 
 - **HTTP**：`POST /api/ingest`，请求头 `X-Api-Key: <ApiKey>`
-- **MQTT**：发布到主题 `metric/{systemCode}/{metricCode}` 或 `ingest`，payload 中必须携带 `"apiKey": "<ApiKey>"`（与服务端绑定系统隔离校验，例如 `{"apiKey":"...","value":87.5}`）
+- **MQTT**：发布到主题 `metric/{systemCode}/{metricCode}` 或 `ingest`，payload 中必须携带 `"apiKey": "<ApiKey>"`（按 Key 的系统范围隔离，例如 `{"apiKey":"...","value":87.5}`）
 - **WebSocket**：连接 `/ws/ingest`，首帧 `{"apiKey": "<ApiKey>"}` 认证，之后每帧一条报文
 
-演示 ApiKey（seed 创建）：`dk_line1_6f3a9c2e8b1d4f70`（绑定系统 `line1`）
+演示 ApiKey（seed 创建）：`dk_line1_6f3a9c2e8b1d4f70`（授权系统 `line1`）
 
 联调脚本：
 
@@ -140,8 +145,8 @@ tests/          vitest 单测
 - 所有接收入口 zod 校验 + 兜底 try/catch，坏消息只记日志不影响其他消息
 - `synchronize: false`，schema 变更只走迁移
 - ingest 记录写入与最新值回写在同一事务；同一指标按序串行处理，乱序/过期报文不覆盖 `last_*` 也不触发告警
-- 上报 payload 截断存储，防超大报文；HTTP / WS 通道与 MQTT 一致：请求体大小限制（64KB）、每 ApiKey 令牌桶限流、全局有界并发（溢出返回 429）
-- MQTT 通道与 HTTP/WS 一致要求 ApiKey，凭 payload 中的 apiKey 完成系统绑定隔离校验
+- 上报 payload 截断存储，防超大报文；HTTP / WS 通道与 MQTT 一致：请求体大小限制（64KB，HTTP 须带 Content-Length，chunked 返回 411）、每 ApiKey 令牌桶限流、全局有界并发（溢出返回 429）
+- MQTT 通道与 HTTP/WS 一致要求 ApiKey，凭 payload 中的 apiKey 完成权限与系统范围校验
 - 记录/指标/ApiKey 缓存 + 未知 code 负缓存（TTL），坏消息洪峰不打穿 DB
 - MQTT 消费经信号量限流（并发 20 / 队列 500），洪峰丢帧记日志而非拖垮服务
 - 登录按 用户名+IP 限流，连续失败锁定 15 分钟；用户可被管理员禁用（登录拦截，保护最后一个可用管理员）
@@ -155,8 +160,9 @@ tests/          vitest 单测
 ## 部署
 
 ```bash
-docker compose up -d --build   # EMQX + app 两容器（MySQL 由 DB_HOST 指向外部实例）
+docker compose up -d --build   # 仅 app 容器；MySQL / EMQX 运行在宿主机，容器经 host.docker.internal 访问
 ```
 
-- app 容器多阶段构建，健康检查走 `/api/health`；依赖注入 `depends_on: service_healthy`
+- app 容器多阶段构建，健康检查走 `/api/health`（DB 或 MQTT 不可用时返回 503）
+- 容器内数据库/MQTT 地址由 `DOCKER_DB_HOST`、`DOCKER_DB_PORT`、`DOCKER_MQTT_URL` 覆盖（默认 `host.docker.internal`），与本地开发用的 `DB_HOST`、`MQTT_URL` 互不影响；宿主机 MySQL / EMQX 需监听 0.0.0.0，MySQL 账号需允许 Docker 网段登录
 - 生产务必通过环境变量覆盖 `JWT_SECRET` 与数据库口令（见 `.env.example`）

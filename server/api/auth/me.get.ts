@@ -1,6 +1,9 @@
-import { requireAuth } from '../../utils/auth'
+import { principalView, requireAuth } from '../../utils/auth'
 
-export default defineEventHandler((event) => {
-  const user = requireAuth(event)
-  return { user: { id: user.userId, username: user.username, role: user.role } }
+export default defineEventHandler(async (event) => {
+  const principal = await requireAuth(event)
+  if (principal.kind === 'apiKey' && !principal.apiKey.permissions.includes('data:read')) {
+    throw createError({ statusCode: 403, statusMessage: 'console login requires data:read' })
+  }
+  return { user: principalView(principal) }
 })

@@ -1,6 +1,6 @@
 <template>
   <div class="container_audit">
-    <h1 class="container_audit_title">审计日志</h1>
+    <UiPageHead title="审计日志" description="管理员对用户、系统、指标与告警配置的变更记录" />
 
     <UiCard class="container_audit_filterCard">
       <div class="container_audit_filterBar">
@@ -87,6 +87,8 @@
 </template>
 
 <script setup lang="ts">
+
+useHead({ title: '审计日志' })
 import type { UiColumn } from '../components/ui/UiTable.vue'
 
 interface AuditLogDto {
@@ -191,18 +193,14 @@ async function onPageSize(size: number) {
   padding: $space-5 $space-4 $space-6;
 }
 
-.container_audit_title {
-  margin: 0 0 $space-4;
-  font-size: $font-xl;
-}
-
 .container_audit_filterCard {
   margin-bottom: $space-4;
+  animation: tc-rise $dur-slow $ease-out 60ms both;
 }
 
 .container_audit_filterBar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 220px));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: $space-3 $space-4;
   align-items: end;
 }
@@ -216,6 +214,12 @@ async function onPageSize(size: number) {
   background: var(--tc-card-bg);
   color: inherit;
   font-size: $font-base;
+  outline: none;
+  transition: border-color $dur-fast $ease-out, box-shadow $dur-fast $ease-out;
+
+  &:hover {
+    border-color: $color-text-secondary;
+  }
 
   &:focus-visible {
     outline: none;
@@ -229,6 +233,7 @@ async function onPageSize(size: number) {
   align-items: center;
   gap: $space-2;
   justify-content: flex-end;
+  grid-column: -2 / -1;
 }
 
 .container_audit_detailBtn {

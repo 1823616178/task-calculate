@@ -113,15 +113,14 @@ function onInput(e: Event) {
     box-shadow: 0 0 0 2px var(--tc-focus-ring);
   }
 
-  &_sm .container_uiInput_field,
-  &.container_uiInput_sm {
-    height: $control-sm;
+  // 高度只加在内部 input 上：外层再设一次会因边框把内容挤出 2px
+  &_sm .container_uiInput_field {
+    height: calc(#{$control-sm} - 2px);
     font-size: $font-sm;
   }
 
-  &_lg .container_uiInput_field,
-  &.container_uiInput_lg {
-    height: $control-lg;
+  &_lg .container_uiInput_field {
+    height: calc(#{$control-lg} - 2px);
     font-size: $font-lg;
   }
 
@@ -142,7 +141,7 @@ function onInput(e: Event) {
 .container_uiInput_field {
   flex: 1;
   min-width: 0;
-  height: $control-md;
+  height: calc(#{$control-md} - 2px);
   padding: 0 $space-2;
   border: none;
   background: transparent;

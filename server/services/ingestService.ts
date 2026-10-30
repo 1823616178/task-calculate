@@ -25,8 +25,10 @@ export interface IngestResult {
 }
 
 export interface IngestOptions {
-  // ApiKey 绑定系统时传入，统一在管道内校验“只能向本系统写数据”
+  // expectedSystemId 保留给旧调用方；新授权模型使用 allowedSystemIds。
   expectedSystemId?: number
+  // undefined=全部系统；数组=只允许这些系统。
+  allowedSystemIds?: number[]
 }
 
 interface SystemCacheEntry {
@@ -95,7 +97,7 @@ async function resolveMetric(systemCode: string, metricCode: string): Promise<Me
 }
 
 /**
- * 统一接收管道：校验 → 系统绑定校验 → 解析指标 → 阈值判定 → 入库（事务）→ 广播。
+ * 统一接收管道：校验 → 系统范围校验 → 解析指标 → 阈值判定 → 入库（事务）→ 广播。
  * 三个接收通道（HTTP / MQTT / WS）都调用此函数。
  */
 export async function ingestData(raw: unknown, channel: IngestChannel, options: IngestOptions = {}): Promise<IngestResult> {
@@ -114,10 +116,13 @@ export async function ingestData(raw: unknown, channel: IngestChannel, options: 
     reportedAt = parsedTime
   }
 
-  // ApiKey 绑定系统，提交方只能向本系统写数据
-  if (options.expectedSystemId !== undefined) {
+  // ApiKey 系统范围校验；未知系统与越权统一 403，避免枚举系统编码。
+  if (options.expectedSystemId !== undefined || options.allowedSystemIds !== undefined) {
     const systemId = await resolveSystemId(systemCode)
-    if (systemId !== null && systemId !== options.expectedSystemId) {
+    const allowed = options.expectedSystemId !== undefined
+      ? systemId === options.expectedSystemId
+      : systemId !== null && options.allowedSystemIds!.includes(systemId)
+    if (!allowed) {
       throw new IngestError('api key not allowed for this system', 403)
     }
   }

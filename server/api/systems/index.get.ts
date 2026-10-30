@@ -1,13 +1,17 @@
 import { initDataSource } from '../../database/data-source'
+import { In } from 'typeorm'
 import { MetricSchema, SystemSchema } from '../../database/entities'
-import { requireAuth } from '../../utils/auth'
+import { requireReadAccess } from '../../utils/readAccess'
 
 // 系统列表 + 各系统指标状态汇总（看板数据源）
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const principal = await requireReadAccess(event)
   const ds = await initDataSource()
-  const systems = await ds.getRepository(SystemSchema).find({ order: { id: 'ASC' } })
-  const metrics = await ds.getRepository(MetricSchema).find({ order: { id: 'ASC' } })
+  const limitedIds = principal.kind === 'apiKey' && !principal.apiKey.allSystems ? principal.apiKey.systemIds : null
+  const systemWhere = limitedIds ? { id: In(limitedIds) } : undefined
+  const metricWhere = limitedIds ? { systemId: In(limitedIds) } : undefined
+  const systems = await ds.getRepository(SystemSchema).find({ where: systemWhere, order: { id: 'ASC' } })
+  const metrics = await ds.getRepository(MetricSchema).find({ where: metricWhere, order: { id: 'ASC' } })
 
   return {
     systems: systems.map((s) => {

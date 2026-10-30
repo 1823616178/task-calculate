@@ -1,12 +1,13 @@
 import { initDataSource } from '../../database/data-source'
 import { SystemSchema } from '../../database/entities'
 import { clearMetricCache } from '../../services/ingestService'
-import { requireAdmin } from '../../utils/auth'
+import { requireAllSystems, requirePermission } from '../../utils/auth'
 import { firstZodMessage, systemInputSchema } from '../../utils/validation'
 import { recordAudit } from '../../utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'systems:manage')
+  requireAllSystems(admin)
   const body = await readBody(event)
   const parsed = systemInputSchema.safeParse(body)
   if (!parsed.success) {

@@ -1,13 +1,14 @@
 import { initDataSource } from '../../../../database/data-source'
 import { AlertChannelSchema } from '../../../../database/entities'
-import { requireAdmin } from '../../../../utils/auth'
+import { requireAllSystems, requirePermission } from '../../../../utils/auth'
 import { sendToChannel } from '../../../../services/alertingService'
 import type { AlertEventInfo } from '../../../../services/alertingService'
 import { recordAudit } from '../../../../utils/audit'
 
 // 发送测试通知：验证渠道配置是否可用
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'alerts:manage')
+  requireAllSystems(admin)
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'invalid id' })

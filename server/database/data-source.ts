@@ -5,6 +5,8 @@ import { AddRecordsStatusIndex1700000001000 } from './migrations/1700000001000-A
 import { AlertingAndAdmin1700000002000 } from './migrations/1700000002000-AlertingAndAdmin'
 import { AnalyticsOpsAudit1700000003000 } from './migrations/1700000003000-AnalyticsOpsAudit'
 import { HashApiKeys1700000004000 } from './migrations/1700000004000-HashApiKeys'
+import { ApiKeyScopes1700000005000 } from './migrations/1700000005000-ApiKeyScopes'
+import { GlobalApiKeys1700000006000 } from './migrations/1700000006000-GlobalApiKeys'
 
 // 缓存在 globalThis 上，避免 Nitro dev 模式 HMR 重复创建连接池
 const globalStore = globalThis as unknown as { __taskCalculateDs?: DataSource }
@@ -25,6 +27,8 @@ export function getDataSource(): DataSource {
         AlertingAndAdmin1700000002000,
         AnalyticsOpsAudit1700000003000,
         HashApiKeys1700000004000,
+        ApiKeyScopes1700000005000,
+        GlobalApiKeys1700000006000,
       ],
       synchronize: false,
       logging: ['error'],

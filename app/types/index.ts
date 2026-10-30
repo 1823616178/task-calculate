@@ -1,4 +1,4 @@
-import type { AlertChannelType, IngestChannel, MetricStatus, UserRole } from '../../shared/types'
+import type { AlertChannelType, ApiPermission, IngestChannel, MetricStatus, UserRole } from '../../shared/types'
 
 export interface SystemDto {
   id: number
@@ -47,6 +47,10 @@ export interface AuthUser {
   id: number
   username: string
   role: UserRole
+  authType: 'user' | 'apiKey'
+  permissions: ApiPermission[]
+  systemIds: number[]
+  allSystems: boolean
 }
 
 export interface AlertChannelDto {
@@ -86,7 +90,9 @@ export interface SilenceRuleDto {
 
 export interface ApiKeyDto {
   id: number
-  systemId: number
+  systemIds: number[]
+  allSystems: boolean
+  permissions: ApiPermission[]
   name: string
   maskedKey: string
   enabled: boolean

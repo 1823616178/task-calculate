@@ -7,6 +7,21 @@ export type UserRole = 'admin' | 'viewer'
 
 export type AlertChannelType = 'webhook' | 'dingtalk' | 'wecom' | 'email'
 
+// ApiKey 能力采用白名单授权；系统范围由 allSystems / systemIds 单独控制。
+export const API_PERMISSIONS = [
+  'data:read',
+  'data:write',
+  'systems:manage',
+  'metrics:manage',
+  'apiKeys:manage',
+  'alerts:manage',
+  'users:manage',
+  'audit:read',
+  'maintenance:run',
+] as const
+
+export type ApiPermission = typeof API_PERMISSIONS[number]
+
 export const METRIC_STATUSES: MetricStatus[] = ['normal', 'warning', 'alarm', 'none']
 
 export const ALERT_CHANNEL_TYPES: AlertChannelType[] = ['webhook', 'dingtalk', 'wecom', 'email']

@@ -36,7 +36,13 @@
 
         <!-- 数据行 -->
         <template v-else>
-          <tr v-for="(row, index) in rows" :key="rowKeyOf(row)" :class="props.rowClass?.(row, index)">
+          <tr
+            v-for="(row, index) in rows"
+            :key="rowKeyOf(row)"
+            class="container_uiTable_row"
+            :class="props.rowClass?.(row, index)"
+            :style="{ '--tc-row-delay': `${Math.min(index, 12) * 25}ms` }"
+          >
             <td
               v-for="col in columns"
               :key="col.key"
@@ -144,21 +150,30 @@ function colStyle(col: UiColumn): Record<string, string> {
   border-bottom: 1px solid $color-border;
   white-space: nowrap;
 
+  // 贴边嵌入卡片时由外层把 --tc-table-radius 置 0
   &:first-child {
-    border-top-left-radius: $radius-card;
+    border-top-left-radius: var(--tc-table-radius, #{$radius-card});
   }
 
   &:last-child {
-    border-top-right-radius: $radius-card;
+    border-top-right-radius: var(--tc-table-radius, #{$radius-card});
   }
 }
 
 .container_uiTable_td {
-  padding: $space-2 $space-3;
+  padding: $space-2 + 2 $space-3;
   border-bottom: 1px solid $color-border;
   font-size: $font-sm;
   color: $color-text;
   overflow-wrap: anywhere;
+}
+
+// 窄屏：单元格不折行，表格按内容撑开并在外层横向滚动（否则编码等会被逐字折断）
+@include down('md') {
+  .container_uiTable_td:not(.container_uiTable_emptyCell) {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
 }
 
 .container_uiTable_td:last-child,
@@ -172,12 +187,28 @@ function colStyle(col: UiColumn): Record<string, string> {
   @include tabular-nums;
 }
 
+// 数据行入场：逐行上浮淡入（新增行同样生效，已渲染的行不会重播）
+.container_uiTable_row {
+  animation: tc-rise $dur-slow $ease-out both;
+  animation-delay: var(--tc-row-delay, 0ms);
+
+  > .container_uiTable_td {
+    transition: background-color $dur-fast $ease-out;
+  }
+}
+
 tbody tr:hover > .container_uiTable_td:not(.container_uiTable_emptyCell) {
   background: var(--tc-hover);
 }
 
+// 末行不再画分隔线，避免与卡片底边形成双线
+tbody tr:last-child > .container_uiTable_td {
+  border-bottom: none;
+}
+
 .container_uiTable_emptyCell {
   padding: 0 !important;
+  animation: tc-fade $dur-slow $ease-out both;
 
   &:hover {
     background: transparent;

@@ -88,6 +88,16 @@ withDefaults(defineProps<{
 
 .container_uiCard_body_flush {
   padding: 0;
+
+  // 贴边表格：去掉表格自身的边框/阴影，与卡片合为一体
+  > :slotted(.container_uiTable_wrap) {
+    --tc-table-radius: 0;
+
+    border: none;
+    border-top: 1px solid $color-border;
+    border-radius: 0 0 $radius-card $radius-card;
+    box-shadow: none;
+  }
 }
 
 .container_uiCard_footer {

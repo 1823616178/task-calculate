@@ -1,10 +1,12 @@
 import { z } from 'zod'
+import { API_PERMISSIONS } from '../../shared/types'
 
 // 统一数据上报报文校验（HTTP / MQTT / WS 三通道一致）
 export const ingestSchema = z.object({
   systemCode: z.string().trim().min(1).max(64),
   metricCode: z.string().trim().min(1).max(64),
-  value: z.coerce.number().refine(Number.isFinite, 'value must be a finite number'),
+  // 统一保留两位小数，消除上报方浮点误差（如 57.900000000000006）
+  value: z.coerce.number().refine(Number.isFinite, 'value must be a finite number').transform(v => Math.round(v * 100) / 100),
   timestamp: z.string().max(40).optional(),
 })
 
@@ -13,6 +15,10 @@ export type IngestInput = z.infer<typeof ingestSchema>
 export const loginSchema = z.object({
   username: z.string().trim().min(1).max(64),
   password: z.string().min(1).max(128),
+})
+
+export const apiKeyLoginSchema = z.object({
+  apiKey: z.string().trim().min(1).max(256),
 })
 
 export const systemInputSchema = z.object({
@@ -94,6 +100,17 @@ export const recordsQuerySchema = dateRangeSchema.extend({
   beforeId: z.coerce.number().int().positive().optional(),
 })
 
+// 按系统编码查询：路径参数 code 与 metricCode 均沿用创建时的编码规则
+export const codeField = z.string().trim().min(1).max(64).regex(/^[\w-]+$/, 'code 仅允许字母/数字/下划线/中划线')
+
+export const recordsByCodeQuerySchema = dateRangeSchema.extend({
+  metricCode: codeField.optional(),
+  status: z.enum(['normal', 'warning', 'alarm', 'none']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  beforeId: z.coerce.number().int().positive().optional(),
+})
+
 export function firstZodMessage(error: z.ZodError): string {
   return error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
 }
@@ -118,14 +135,12 @@ export const alertRuleSchema = z.object({
   enabled: z.boolean().optional(),
 })
 
-const isoDate = z.string().datetime({ offset: true })
-
 export const silenceRuleSchema = z
   .object({
     systemId: z.coerce.number().int().positive().nullish(),
     metricId: z.coerce.number().int().positive().nullish(),
-    startAt: isoDate,
-    endAt: isoDate,
+    startAt: isoDateField,
+    endAt: isoDateField,
     reason: z.string().trim().max(255).default(''),
   })
   .refine(v => new Date(v.endAt).getTime() > new Date(v.startAt).getTime(), {
@@ -136,13 +151,22 @@ export const silenceRuleSchema = z
 // ---- ApiKey 管理 ----
 
 export const apiKeyCreateSchema = z.object({
-  systemId: z.coerce.number().int().positive(),
   name: z.string().trim().min(1).max(128),
+  systemIds: z.array(z.coerce.number().int().positive()).max(1000).default([]),
+  allSystems: z.boolean().default(false),
+  permissions: z.array(z.enum(API_PERMISSIONS)).min(1).max(API_PERMISSIONS.length).default(['data:read', 'data:write']),
+}).superRefine((value, ctx) => {
+  if (!value.allSystems && value.systemIds.length === 0) {
+    ctx.addIssue({ code: 'custom', path: ['systemIds'], message: '非全系统 Key 至少需要一个授权系统' })
+  }
 })
 
 export const apiKeyUpdateSchema = z.object({
   name: z.string().trim().min(1).max(128).optional(),
   enabled: z.boolean().optional(),
+  systemIds: z.array(z.coerce.number().int().positive()).max(1000).optional(),
+  allSystems: z.boolean().optional(),
+  permissions: z.array(z.enum(API_PERMISSIONS)).min(1).max(API_PERMISSIONS.length).optional(),
 })
 
 // ---- 用户管理 ----

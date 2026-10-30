@@ -124,6 +124,63 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
+// 页面 / 布局切换过渡（配合 nuxt.config 的 pageTransition / layoutTransition）
+.page-enter-active,
+.page-leave-active,
+.layout-enter-active,
+.layout-leave-active {
+  transition: opacity $dur-base $ease-out, transform $dur-base $ease-out;
+}
+
+.page-enter-from,
+.layout-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to,
+.layout-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+// ---- 共享关键帧（scoped 样式中直接引用名称即可）----
+// 上浮淡入：卡片、面板、列表项入场
+@keyframes tc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// 纯淡入：Tab 面板切换等不需要位移的场景
+@keyframes tc-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+// 告警呼吸光晕：颜色取自元素上的 --tc-glow
+@keyframes tc-glow {
+  0%,
+  100% {
+    box-shadow: var(--tc-shadow-1), 0 0 0 0 var(--tc-glow, transparent);
+  }
+
+  50% {
+    box-shadow: var(--tc-shadow-1), 0 0 0 4px var(--tc-glow, transparent);
+  }
+}
+
 // 弹窗打开期间锁定 body 滚动（多层弹窗计数归零后移除）
 body.tc-scroll-lock {
   overflow: hidden;

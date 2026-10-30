@@ -1,7 +1,7 @@
 import { initDataSource } from '../../database/data-source'
 import { MetricSchema, SystemSchema } from '../../database/entities'
 import { clearMetricCache } from '../../services/ingestService'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission, requireSystemAccess } from '../../utils/auth'
 import { firstZodMessage, metricInputSchema } from '../../utils/validation'
 import { z } from 'zod'
 import { recordAudit } from '../../utils/audit'
@@ -11,7 +11,7 @@ const createMetricSchema = metricInputSchema.extend({
 })
 
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'metrics:manage')
   const body = await readBody(event)
   const parsed = createMetricSchema.safeParse(body)
   if (!parsed.success) {
@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
   if (!system) {
     throw createError({ statusCode: 404, statusMessage: 'system not found' })
   }
+  requireSystemAccess(admin, system.id)
 
   const repo = ds.getRepository(MetricSchema)
   const exists = await repo.findOne({ where: { systemId, code: data.code } })

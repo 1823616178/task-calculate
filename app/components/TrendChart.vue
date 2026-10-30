@@ -58,12 +58,12 @@
 
     <div v-show="hasData && !error" ref="chartEl" class="container_trendChart_canvas" />
 
-    <p
-      v-if="!hasData && !loading && !error && selected.size >= 0"
+    <UiEmpty
+      v-if="!hasData && !loading && !error"
       class="container_trendChart_empty"
-    >
-      {{ selected.size === 0 ? '请选择至少一个指标' : '所选时间范围内暂无数据' }}
-    </p>
+      :text="selected.size === 0 ? '请选择至少一个指标' : '所选时间范围内暂无数据'"
+      :description="selected.size === 0 ? '点击上方指标标签即可加入对比' : '可以尝试扩大时间范围，或确认数据是否正常上报'"
+    />
   </div>
 </template>
 
@@ -137,33 +137,36 @@ onBeforeUnmount(() => {
   chart = null
 })
 
+// 空选择也走 load()：递增请求序号，丢弃进行中的旧请求结果
 watch([selected, range, bucket], () => {
-  if (selected.value.size > 0) void load()
-  else {
-    hasData.value = false
-    render([])
-  }
+  void load()
 })
 
 // ---- 主题联动：从 CSS 变量读取轴线/文字/分割线色，切换主题时重绘 ----
-const chartTheme = computed(() => ({
-  textColor: getCssVar('--tc-text-secondary'),
-  splitLine: getCssVar('--tc-border'),
-  tooltipBg: getCssVar('--tc-card-bg'),
-}))
+// 普通函数而非 computed：getComputedStyle 不是响应式依赖，computed 会永久缓存首次取值
+function chartTheme() {
+  return {
+    textColor: getCssVar('--tc-text-secondary'),
+    splitLine: getCssVar('--tc-border'),
+    tooltipBg: getCssVar('--tc-card-bg'),
+  }
+}
 
 function getCssVar(name: string): string {
   if (!import.meta.client) return ''
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-watch(chartTheme, () => {
-  // 已有数据时仅重新应用样式（notMerge=false 合并更新）
-  if (hasData.value) void load()
-})
+// data-theme 属性在 toggle 时同步写入，nextTick 后读取新变量值，用已有数据重绘，无需重新请求
+let themeRedraw = false
 
 watch(() => theme.theme.value, () => {
-  if (hasData.value) void load()
+  if (!hasData.value) return
+  void nextTick(() => {
+    themeRedraw = true
+    render(lastResults)
+    themeRedraw = false
+  })
 })
 
 function toggleMetric(id: number) {
@@ -181,6 +184,8 @@ async function load() {
   error.value = ''
   const ids = [...selected.value]
   if (ids.length === 0) {
+    lastResults = []
+    loading.value = false
     render([])
     return
   }
@@ -245,7 +250,7 @@ function render(results: SeriesResult[]) {
     chart = echarts.init(chartEl.value)
   }
 
-  const t = chartTheme.value
+  const t = chartTheme()
   const windowSeconds = results[0]?.windowSeconds ?? 300
   // x 轴使用 time 类型：刻度与数据共用原始时间戳，避免 category 轴按格式化标签匹配造成的错位
   const hasAnyPoint = results.some(r => r.points.length > 0)
@@ -262,6 +267,8 @@ function render(results: SeriesResult[]) {
         name: `${metric.name}-band-base`,
         type: 'line',
         stack: `band_${idx}`,
+        // 默认 samesign 策略下负的 min 与正的差值不会叠加，区间带会画错
+        stackStrategy: 'all',
         data: points.map(p => [timeValue(p), p.min] as const),
         lineStyle: { opacity: 0 },
         symbol: 'none',
@@ -273,6 +280,7 @@ function render(results: SeriesResult[]) {
         name: `${metric.name}-band`,
         type: 'line',
         stack: `band_${idx}`,
+        stackStrategy: 'all',
         data: points.map(p => [timeValue(p), Math.max(0, p.max - p.min)] as const),
         areaStyle: { color, opacity: 0.08 },
         lineStyle: { opacity: 0 },
@@ -287,15 +295,20 @@ function render(results: SeriesResult[]) {
       name: metric.name,
       type: 'line',
       showSymbol: points.length <= 60,
+      symbolSize: 5,
       connectNulls: true,
       itemStyle: { color },
       lineStyle: { color, width: 2 },
+      emphasis: { focus: 'series' },
       data: points.map(p => [timeValue(p), p.avg] as const),
     })
   })
 
   chart.setOption({
-    animation: false,
+    // 首次出图与切换指标时折线自左向右展开；主题切换重绘不播放
+    animation: !themeRedraw,
+    animationDuration: 600,
+    animationEasing: 'cubicOut',
     color: SERIES_COLORS,
     grid: { left: 48, right: 16, top: 32, bottom: 40 },
     legend: {
@@ -413,7 +426,12 @@ function exportPng() {
   color: $color-text-secondary;
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color $dur-fast ease, background-color $dur-fast ease, color $dur-fast ease;
+  transition: border-color $dur-fast ease, background-color $dur-fast ease, color $dur-fast ease,
+    transform $dur-fast $ease-out;
+
+  &:active {
+    transform: scale(0.96);
+  }
 
   &:hover {
     border-color: $color-text-secondary;
@@ -436,6 +454,11 @@ function exportPng() {
   height: 8px;
   border-radius: $radius-pill;
   flex-shrink: 0;
+  transition: transform $dur-base $ease-spring;
+}
+
+.container_trendChart_chip_active .container_trendChart_chipDot {
+  transform: scale(1.25);
 }
 
 .container_trendChart_controls {
@@ -448,6 +471,7 @@ function exportPng() {
 .container_trendChart_canvas {
   width: 100%;
   height: 320px;
+  animation: tc-fade $dur-slow $ease-out both;
 }
 
 .container_trendChart_skeleton {
@@ -467,8 +491,6 @@ function exportPng() {
 }
 
 .container_trendChart_empty {
-  text-align: center;
-  color: $color-text-secondary;
-  padding: $space-6 0;
+  min-height: 320px;
 }
 </style>

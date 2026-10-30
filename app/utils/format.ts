@@ -4,7 +4,9 @@ export function formatDate(input: string | number | Date | null | undefined): st
   if (input === null || input === undefined || input === '') return '—'
   const d = input instanceof Date ? input : new Date(input)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString()
+  // 固定格式：toLocaleString() 随浏览器语言变化（英文环境显示 8/27/2026, 12:18:30 AM），且 SSR 与客户端可能不一致
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 export function formatDateOnly(input: string | number | Date | null | undefined): string {

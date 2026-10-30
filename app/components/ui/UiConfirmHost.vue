@@ -39,15 +39,14 @@
       <UiButton variant="secondary" size="md" @click="resolve(item, false)">
         {{ item.cancelText || '取消' }}
       </UiButton>
-      <button
-        type="button"
-        class="container_uiConfirmHost_ok"
-        :class="[item.danger ? 'container_uiConfirmHost_ok_danger' : 'container_uiConfirmHost_ok_primary']"
+      <UiButton
+        :variant="item.danger ? 'danger' : 'primary'"
+        size="md"
         :disabled="!!item.requireText && typed !== item.requireText"
         @click="resolve(item, true)"
       >
         {{ item.confirmText || (item.danger ? '删除' : '确定') }}
-      </button>
+      </UiButton>
     </template>
   </UiModal>
 </template>
@@ -102,28 +101,5 @@ function resolve(item: ConfirmItem, ok: boolean) {
 
 .container_uiConfirmHost_input {
   width: 100%;
-}
-
-.container_uiConfirmHost_ok {
-  height: $control-md;
-  padding: 0 $space-4;
-  border: none;
-  border-radius: $radius-md;
-  color: #fff;
-  font-size: $font-base;
-  cursor: pointer;
-  transition: filter $dur-fast ease, opacity $dur-fast ease;
-
-  &_primary { background: $color-primary; }
-
-  &_danger { background: $color-danger; }
-
-  &:hover:not(:disabled) { filter: brightness(0.92); }
-
-  &_disabled,
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 }
 </style>

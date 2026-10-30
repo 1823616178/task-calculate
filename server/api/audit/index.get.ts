@@ -1,6 +1,6 @@
 import { initDataSource } from '../../database/data-source'
 import { AuditLogSchema } from '../../database/entities'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission } from '../../utils/auth'
 import { z } from 'zod'
 import { firstZodMessage } from '../../utils/validation'
 
@@ -15,7 +15,7 @@ const auditQuerySchema = z.object({
 
 // 审计日志查询（管理端）
 export default defineEventHandler(async (event) => {
-  requireAdmin(event)
+  await requirePermission(event, 'audit:read')
   const parsed = auditQuerySchema.safeParse(getQuery(event))
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: firstZodMessage(parsed.error) })

@@ -4,10 +4,9 @@
     size="md"
     :title="mode === 'create' ? '新建系统' : '编辑系统'"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
-    @closed="onClosed"
   >
     <div class="container_systemFormModal_form">
-      <UiField label="系统编码" required hint="仅小写字母、数字与连字符，创建后不可修改">
+      <UiField label="系统编码" required hint="仅字母、数字、下划线与连字符，创建后不可修改">
         <UiInput
           v-model="form.code"
           data-autofocus
@@ -28,7 +27,7 @@
       </UiField>
       <p v-if="errors.name" class="container_systemFormModal_error" role="alert">{{ errors.name }}</p>
 
-      <UiField label="描述" class="container_systemFormModal_full">
+      <UiField label="描述">
         <UiTextarea v-model="form.description" placeholder="可选，用于说明系统用途" :rows="3" />
       </UiField>
 
@@ -68,7 +67,8 @@ const emit = defineEmits<{
 const toast = useToast()
 const dashboard = useDashboardStore()
 
-const CODE_RE = /^[a-z0-9][a-z0-9-]*$/
+// 与服务端 systemInputSchema 保持一致
+const CODE_RE = /^[\w-]+$/
 
 const form = reactive({ code: '', name: '', description: '', retentionDays: '' })
 const errors = reactive<{ code?: string, name?: string }>({})
@@ -97,16 +97,12 @@ function numOrNull(v: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function onClosed() {
-  // 关闭后重置错误态，避免下次打开残留
-}
-
 async function submit() {
   errors.code = ''
   errors.name = ''
   let ok = true
   if (props.mode === 'create' && !CODE_RE.test(form.code.trim())) {
-    errors.code = '编码需以小写字母或数字开头，只能包含小写字母、数字、连字符'
+    errors.code = '编码只能包含字母、数字、下划线与连字符'
     ok = false
   }
   if (!form.name.trim()) {
@@ -150,6 +146,12 @@ async function submit() {
 </script>
 
 <style lang="scss" scoped>
+.container_systemFormModal_form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+}
+
 .container_systemFormModal_error {
   margin: -6px 0 0;
   color: $color-danger;

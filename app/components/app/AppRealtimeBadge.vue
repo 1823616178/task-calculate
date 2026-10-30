@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootEl" class="container_appRealtimeBadge">
+  <div class="container_appRealtimeBadge">
     <button
       type="button"
       class="container_appRealtimeBadge_pill"

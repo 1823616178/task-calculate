@@ -1,13 +1,13 @@
 import { initDataSource } from '../../database/data-source'
 import { MetricSchema } from '../../database/entities'
 import { clearMetricCache } from '../../services/ingestService'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission, requireSystemAccess } from '../../utils/auth'
 import { firstZodMessage, metricInputSchema } from '../../utils/validation'
 import { recordAudit } from '../../utils/audit'
 
 // 更新指标（code 不可改；阈值修改后清空接收缓存，新数据立即按新规则判定）
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'metrics:manage')
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'invalid id' })
@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
   if (!metric) {
     throw createError({ statusCode: 404, statusMessage: 'metric not found' })
   }
+  requireSystemAccess(admin, metric.systemId)
 
   const data = parsed.data
   if (data.name !== undefined) metric.name = data.name

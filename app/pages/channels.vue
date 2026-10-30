@@ -1,9 +1,10 @@
 <template>
   <div class="container_channels">
-    <div class="container_channels_pageHead">
-      <h1 class="container_channels_title">通知渠道</h1>
-      <UiButton variant="primary" @click="openCreate">+ 新建渠道</UiButton>
-    </div>
+    <UiPageHead title="通知渠道" description="预警 / 告警发生时，通过这些渠道发送通知">
+      <template v-if="canManageChannels" #actions>
+        <UiButton variant="primary" @click="openCreate">+ 新建渠道</UiButton>
+      </template>
+    </UiPageHead>
 
     <UiTable
       :columns="columns"
@@ -15,7 +16,7 @@
     >
       <template #empty>
         <UiEmpty text="暂无通知渠道" description="创建渠道后才能接收预警 / 告警通知">
-          <UiButton variant="primary" @click="openCreate">+ 新建渠道</UiButton>
+          <UiButton v-if="canManageChannels" variant="primary" @click="openCreate">+ 新建渠道</UiButton>
         </UiEmpty>
       </template>
 
@@ -38,6 +39,7 @@
       <template #cell_enabled="{ row }">
         <UiSwitch
           :model-value="Boolean(row.enabled)"
+          :disabled="!canManageChannels"
           :aria-label="`${row.name} 启用开关`"
           @update:model-value="(v) => toggle(row, v)"
         />
@@ -47,7 +49,7 @@
         {{ formatDate(row.createdAt) }}
       </template>
 
-      <template #cell_actions="{ row }">
+      <template v-if="canManageChannels" #cell_actions="{ row }">
         <div class="container_channels_actions">
           <UiButton variant="link" size="sm" @click="openEdit(row)">编辑</UiButton>
           <UiButton
@@ -76,6 +78,8 @@
 </template>
 
 <script setup lang="ts">
+
+useHead({ title: '通知渠道' })
 import type { AlertChannelDto } from '../types'
 import type { AlertChannelType } from '../../shared/types'
 import type { UiColumn } from '../components/ui/UiTable.vue'
@@ -90,6 +94,7 @@ const loading = ref(false)
 const testingId = ref<number | null>(null)
 const formVisible = ref(false)
 const editTarget = ref<AlertChannelDto | null>(null)
+const canManageChannels = computed(() => auth.user?.allSystems === true)
 
 const TYPE_LABELS: Record<AlertChannelType, string> = {
   webhook: 'Webhook',
@@ -182,19 +187,6 @@ async function remove(c: AlertChannelDto) {
   padding: $space-5 $space-4 $space-6;
 }
 
-.container_channels_pageHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-3;
-  margin-bottom: $space-4;
-}
-
-.container_channels_title {
-  margin: 0;
-  font-size: $font-xl;
-}
-
 .container_channels_type {
   display: inline-flex;
   align-items: center;
@@ -207,6 +199,13 @@ async function remove(c: AlertChannelDto) {
 }
 
 .container_channels_typeGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: $radius-md;
+  background: var(--tc-hover);
   font-weight: 700;
 }
 

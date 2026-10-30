@@ -6,13 +6,16 @@
     role="img"
     :aria-label="titleText"
   >
-    <span
-      v-for="(seg, i) in segments"
-      :key="i"
-      class="container_metricThresholdBar_seg"
-      :class="`container_metricThresholdBar_seg_${seg.kind}`"
-      :style="{ width: seg.pct + '%' }"
-    />
+    <!-- 分段放进独立轨道裁切圆角；当前值指示条在轨道外，不会被裁掉 -->
+    <span class="container_metricThresholdBar_track">
+      <span
+        v-for="(seg, i) in segments"
+        :key="i"
+        class="container_metricThresholdBar_seg"
+        :class="`container_metricThresholdBar_seg_${seg.kind}`"
+        :style="{ width: seg.pct + '%' }"
+      />
+    </span>
     <!-- 当前值位置指示 -->
     <span
       v-if="valuePct !== null"
@@ -123,14 +126,19 @@ const titleText = computed(() => {
 <style lang="scss" scoped>
 .container_metricThresholdBar {
   position: relative;
-  display: flex;
-  gap: 1px;
+  display: block;
   width: 100%;
   min-width: 120px;
   height: 8px;
+}
+
+.container_metricThresholdBar_track {
+  display: flex;
+  gap: 1px;
+  height: 100%;
   border-radius: $radius-pill;
-  overflow: hidden;
   background: var(--tc-hover);
+  overflow: hidden;
 }
 
 .container_metricThresholdBar_seg {
@@ -146,10 +154,11 @@ const titleText = computed(() => {
   top: -2px;
   bottom: -2px;
   width: 3px;
-  border-radius: 999px;
+  margin-left: -1.5px;
+  border-radius: $radius-pill;
   background: $color-text;
   box-shadow: 0 0 0 1px var(--tc-card-bg);
-  transition: left $dur-base $ease-out;
+  transition: left $dur-slow $ease-out;
 }
 
 .container_metricThresholdBar_none {

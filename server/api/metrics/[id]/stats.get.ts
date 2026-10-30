@@ -1,6 +1,6 @@
 import { initDataSource } from '../../../database/data-source'
 import { MetricSchema } from '../../../database/entities'
-import { requireAuth } from '../../../utils/auth'
+import { assertMetricReadable, requireReadAccess } from '../../../utils/readAccess'
 import { WINDOW_SECONDS, firstZodMessage, statsQuerySchema } from '../../../utils/validation'
 import { pickWindowSeconds } from '../../../utils/stats'
 
@@ -15,7 +15,7 @@ interface StatRow {
 // 聚合统计：按时间窗口分组的 min/max/avg/count，供趋势图使用。
 // window=auto 时按时间跨度自动选窗口（约 ≤240 点）。
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const principal = await requireReadAccess(event)
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'invalid id' })
@@ -29,9 +29,7 @@ export default defineEventHandler(async (event) => {
 
   const ds = await initDataSource()
   const metric = await ds.getRepository(MetricSchema).findOne({ where: { id } })
-  if (!metric) {
-    throw createError({ statusCode: 404, statusMessage: 'metric not found' })
-  }
+  assertMetricReadable(principal, metric)
 
   // 默认最近 24 小时
   const toTime = to ? new Date(to).getTime() : Date.now()

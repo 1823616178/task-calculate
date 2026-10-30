@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { Not } from 'typeorm'
 import { initDataSource } from '../../database/data-source'
 import { UserSchema } from '../../database/entities'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission } from '../../utils/auth'
 import { firstZodMessage, userUpdateSchema } from '../../utils/validation'
 import { recordAudit } from '../../utils/audit'
 
@@ -11,7 +11,7 @@ async function countOtherAdmins(ds: Awaited<ReturnType<typeof initDataSource>>, 
 }
 
 export default defineEventHandler(async (event) => {
-  const current = requireAdmin(event)
+  const current = await requirePermission(event, 'users:manage')
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'invalid id' })
@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
   if (losingAdmin && (await countOtherAdmins(ds, id)) === 0) {
     throw createError({ statusCode: 400, statusMessage: '不能禁用或降级最后一个可用的管理员' })
   }
-  if (id === current.userId && data.enabled === false) {
+  if (current.kind === 'user' && id === current.userId && data.enabled === false) {
     throw createError({ statusCode: 400, statusMessage: '不能禁用当前登录用户' })
   }
 

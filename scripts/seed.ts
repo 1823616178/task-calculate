@@ -64,10 +64,23 @@ async function main() {
   }
 
   const keyRepo = ds.getRepository(ApiKeySchema)
-  const demoKey = isProd ? generateApiKey() : DEMO_API_KEY
-  const existsKey = await keyRepo.findOne({ where: { key: hashApiKey(demoKey) } })
+  const demoKeyName = '一号产线演示 Key'
+  // 生产环境每次生成随机 key，无法按摘要查重，改按名称判断是否已创建
+  const existsKey = isProd
+    ? await keyRepo.findOne({ where: { name: demoKeyName } })
+    : await keyRepo.findOne({ where: { key: hashApiKey(DEMO_API_KEY) } })
   if (!existsKey) {
-    await keyRepo.save(keyRepo.create({ systemId: line1.id, key: hashApiKey(demoKey), keyPrefix: demoKey.slice(0, 8), name: '一号产线演示 Key', enabled: true }))
+    const demoKey = isProd ? generateApiKey() : DEMO_API_KEY
+    await keyRepo.save(keyRepo.create({
+      legacySystemId: null,
+      systemIds: [line1.id],
+      allSystems: false,
+      permissions: ['data:read', 'data:write'],
+      key: hashApiKey(demoKey),
+      keyPrefix: demoKey.slice(0, 8),
+      name: demoKeyName,
+      enabled: true,
+    }))
     console.log(`created api key: ${demoKey}${isProd ? '（仅本次打印）' : ''}`)
   }
 

@@ -1,20 +1,24 @@
 <template>
   <div class="container_records">
-    <h1 class="container_records_title">历史记录</h1>
-
-    <!-- 快捷时间范围 -->
-    <div class="container_records_quickRange" role="group" aria-label="快捷时间范围">
-      <UiButton
-        v-for="q in QUICK_RANGES"
-        :key="q.key"
-        variant="secondary"
-        size="sm"
-        :class="{ container_records_quickActive: activeQuick === q.key }"
-        @click="applyQuick(q)"
-      >{{ q.label }}</UiButton>
-    </div>
+    <UiPageHead title="历史记录" description="按系统、指标、状态与时间范围检索上报记录，支持导出 CSV" />
 
     <UiCard class="container_records_filterCard">
+      <!-- 快捷时间范围 -->
+      <div class="container_records_quickRange" role="group" aria-label="快捷时间范围">
+        <span class="container_records_quickLabel">时间范围</span>
+        <div class="container_records_segment">
+          <button
+            v-for="q in QUICK_RANGES"
+            :key="q.key"
+            type="button"
+            class="container_records_segmentItem"
+            :class="{ container_records_segmentItem_active: activeQuick === q.key }"
+            :aria-pressed="activeQuick === q.key ? 'true' : 'false'"
+            @click="applyQuick(q)"
+          >{{ q.label }}</button>
+        </div>
+      </div>
+
       <div class="container_records_filterBar">
         <UiField label="系统">
           <UiSelect v-model.number="filters.systemId" aria-label="按系统筛选">
@@ -57,23 +61,22 @@
             aria-label="结束时间"
           >
         </UiField>
-
-        <div class="container_records_filterActions">
-          <UiButton variant="ghost" size="sm" @click="resetFilters">重置</UiButton>
-          <UiButton variant="primary" :loading="loading && !exporting" @click="search">查询</UiButton>
-          <UiButton variant="secondary" :loading="exporting" @click="exportCsv">导出 CSV</UiButton>
-        </div>
       </div>
 
-      <!-- 已选条件 chips -->
-      <div v-if="activeChips.length > 0" class="container_records_chips">
-        <span class="container_records_chipsLabel">已选：</span>
-        <UiTag
-          v-for="chip in activeChips"
-          :key="chip.key"
-          closable
-          @close="removeChip(chip)"
-        >{{ chip.label }}</UiTag>
+      <div class="container_records_filterActions">
+        <!-- 已选条件 chips -->
+        <div v-if="activeChips.length > 0" class="container_records_chips">
+          <span class="container_records_chipsLabel">已选：</span>
+          <UiTag
+            v-for="chip in activeChips"
+            :key="chip.key"
+            closable
+            @close="removeChip(chip)"
+          >{{ chip.label }}</UiTag>
+        </div>
+        <UiButton variant="ghost" @click="resetFilters">重置</UiButton>
+        <UiButton variant="secondary" :loading="exporting" @click="exportCsv">导出 CSV</UiButton>
+        <UiButton variant="primary" :loading="loading && !exporting" @click="search">查询</UiButton>
       </div>
     </UiCard>
 
@@ -118,6 +121,8 @@
 </template>
 
 <script setup lang="ts">
+
+useHead({ title: '历史记录' })
 import type { MetricDto, RecordDto } from '../types'
 import type { MetricStatus } from '../../shared/types'
 import type { UiColumn } from '../components/ui/UiTable.vue'
@@ -350,32 +355,64 @@ function resetFilters() {
   padding: $space-5 $space-4 $space-6;
 }
 
-.container_records_title {
-  margin: 0 0 $space-3;
-  font-size: $font-xl;
-}
-
 .container_records_quickRange {
   display: flex;
   align-items: center;
-  gap: $space-2;
-  margin-bottom: $space-3;
+  gap: $space-3;
   flex-wrap: wrap;
+  margin-bottom: $space-4;
 }
 
-.container_records_quickActive {
-  border-color: var(--tc-primary);
-  color: var(--tc-primary);
-  background: var(--tc-primary-soft) !important;
+.container_records_quickLabel {
+  font-size: $font-sm;
+  font-weight: 500;
+}
+
+// 分段选择器
+.container_records_segment {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: $radius-md + 2;
+  background: var(--tc-bg-subtle);
+  border: 1px solid $color-border;
+}
+
+.container_records_segmentItem {
+  height: $control-sm - 2;
+  padding: 0 $space-3;
+  border: none;
+  border-radius: $radius-md;
+  background: transparent;
+  color: $color-text-secondary;
+  font-size: $font-sm;
+  cursor: pointer;
+  transition: background-color $dur-base $ease-out, color $dur-base $ease-out, box-shadow $dur-base $ease-out;
+
+  &:hover {
+    color: $color-text;
+  }
+
+  &_active {
+    background: var(--tc-card-bg);
+    color: $color-primary;
+    font-weight: 600;
+    box-shadow: var(--tc-shadow-1);
+
+    &:hover {
+      color: $color-primary;
+    }
+  }
 }
 
 .container_records_filterCard {
   margin-bottom: $space-4;
+  animation: tc-rise $dur-slow $ease-out 60ms both;
 }
 
 .container_records_filterBar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 210px));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: $space-3 $space-4;
   align-items: end;
 
@@ -394,9 +431,14 @@ function resetFilters() {
   background: var(--tc-card-bg);
   color: inherit;
   font-size: $font-base;
+  outline: none;
+  transition: border-color $dur-fast $ease-out, box-shadow $dur-fast $ease-out;
+
+  &:hover {
+    border-color: $color-text-secondary;
+  }
 
   &:focus-visible {
-    outline: none;
     border-color: $color-primary;
     box-shadow: 0 0 0 2px var(--tc-focus-ring);
   }
@@ -408,14 +450,18 @@ function resetFilters() {
   gap: $space-2;
   justify-content: flex-end;
   flex-wrap: wrap;
+  margin-top: $space-4;
+  padding-top: $space-4;
+  border-top: 1px dashed $color-border;
 }
 
 .container_records_chips {
+  animation: tc-fade $dur-base $ease-out both;
   display: flex;
   align-items: center;
   gap: $space-2;
   flex-wrap: wrap;
-  margin-top: $space-3;
+  margin-right: auto;
 }
 
 .container_records_chipsLabel {

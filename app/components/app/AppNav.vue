@@ -12,9 +12,9 @@
         </NuxtLink>
       </li>
 
-      <template v-if="auth.isAdmin">
+      <template v-if="visibleAdminItems.length > 0">
         <li class="container_appNav_adminGroup" aria-hidden="true" />
-        <li v-for="item in adminItems" :key="item.to">
+        <li v-for="item in visibleAdminItems" :key="item.to">
           <NuxtLink
             :to="item.to"
             class="container_appNav_link container_appNav_link_admin"
@@ -42,13 +42,16 @@ const commonItems = [
   { to: '/', label: '看板' },
   { to: '/systems', label: '系统' },
   { to: '/records', label: '历史记录' },
+  { to: '/api-docs', label: 'API' },
 ]
 
 const adminItems = [
-  { to: '/channels', label: '通知渠道' },
-  { to: '/users', label: '用户' },
-  { to: '/audit', label: '审计' },
+  { to: '/api-keys', label: 'ApiKey', permission: 'apiKeys:manage' as const },
+  { to: '/channels', label: '通知渠道', permission: 'alerts:manage' as const },
+  { to: '/users', label: '用户', permission: 'users:manage' as const },
+  { to: '/audit', label: '审计', permission: 'audit:read' as const },
 ]
+const visibleAdminItems = computed(() => adminItems.filter(item => auth.can(item.permission)))
 
 function isActive(href: string): boolean {
   // /systems/* 归入"系统"；首页要求精确匹配
@@ -60,44 +63,61 @@ const open = computed(() => props.open ?? false)
 </script>
 
 <style lang="scss" scoped>
-.container_appNav_closed,
-.container_appNav_open {
-  &_list {
-    display: flex;
-    align-items: center;
-    gap: $space-1;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+.container_appNav_list {
+  display: flex;
+  align-items: center;
+  gap: $space-1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.container_appNav_link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: $control-md;
+  padding: 0 $space-3;
+  border-radius: $radius-md;
+  color: $color-text-secondary;
+  font-size: $font-base;
+  transition: color $dur-fast $ease-out, background-color $dur-fast $ease-out;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    color: $color-text;
+    background: var(--tc-hover);
   }
 
-  .container_appNav_link {
-    display: inline-flex;
-    align-items: center;
-    height: $control-md;
-    padding: 0 $space-3;
-    border-radius: $radius-md;
-    color: $color-text-secondary;
-    font-size: $font-base;
-    transition: color $dur-fast $ease-out, background-color $dur-fast $ease-out;
-    white-space: nowrap;
-    cursor: pointer;
-
-    &:hover {
-      color: $color-text;
-      background: var(--tc-hover);
-    }
-
-    &:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 2px var(--tc-focus-ring);
-    }
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--tc-focus-ring);
   }
 
-  .container_appNav_link_active {
-    color: $color-primary;
-    font-weight: 500;
-    background: var(--tc-active);
+  // 选中项下划线：随激活状态展开
+  &::after {
+    content: '';
+    position: absolute;
+    left: $space-3;
+    right: $space-3;
+    bottom: 3px;
+    height: 2px;
+    border-radius: $radius-pill;
+    background: currentcolor;
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform $dur-base $ease-out;
+  }
+}
+
+.container_appNav_link_active {
+  color: $color-primary;
+  font-weight: 500;
+  background: var(--tc-active);
+
+  &::after {
+    transform: scaleX(1);
   }
 }
 
@@ -135,6 +155,10 @@ const open = computed(() => props.open ?? false)
     .container_appNav_link {
       width: 100%;
       height: $control-lg;
+
+      &::after {
+        content: none;
+      }
     }
 
     .container_appNav_adminGroup {

@@ -171,10 +171,11 @@ describe('silenceRuleSchema', () => {
 })
 
 describe('apiKeyCreateSchema / userCreateSchema', () => {
-  it('ApiKey 创建需要 systemId 与名称', () => {
-    expect(apiKeyCreateSchema.safeParse({ systemId: 1, name: '网关' }).success).toBe(true)
-    expect(apiKeyCreateSchema.safeParse({ systemId: 0, name: '网关' }).success).toBe(false)
-    expect(apiKeyCreateSchema.safeParse({ systemId: 1, name: '' }).success).toBe(false)
+  it('ApiKey 是全局实体，但必须配置系统范围与名称', () => {
+    expect(apiKeyCreateSchema.safeParse({ systemIds: [1], name: '网关' }).success).toBe(true)
+    expect(apiKeyCreateSchema.safeParse({ allSystems: true, name: '全局网关' }).success).toBe(true)
+    expect(apiKeyCreateSchema.safeParse({ name: '无范围网关' }).success).toBe(false)
+    expect(apiKeyCreateSchema.safeParse({ systemIds: [1], name: '' }).success).toBe(false)
   })
 
   it('用户名格式与密码长度校验', () => {

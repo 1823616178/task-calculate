@@ -3,15 +3,20 @@ import { ApiKeySchema } from '../database/entities'
 import type { ApiKeyEntity } from '../database/entities'
 import { hashApiKey } from './apiKeyGen'
 
-// 数据提交方凭 ApiKey 调用 HTTP / WS 接收通道；ApiKey 绑定到某个系统。
+// ApiKey 同时用于数据通道、REST 与控制台登录；权限和系统范围保存在实体中。
 // 短 TTL 缓存避免每次上报都查库；管理端禁用/删除最多 TTL 后生效。
 const API_KEY_TTL_MS = 30_000
 // last_used_at 回写节流：60 秒内多次使用只写一次，避免写放大
 const LAST_USED_THROTTLE_MS = 60_000
 const cache = new Map<string, { apiKey: ApiKeyEntity, expiresAt: number }>()
+// 无效 key 负缓存（按摘要存储、条目有上限），防止坏 key 洪峰每次直查 DB
+const NEGATIVE_TTL_MS = 10_000
+const NEGATIVE_MAX = 10_000
+const negativeCache = new Map<string, number>()
 
 export function clearApiKeyCache(): void {
   cache.clear()
+  negativeCache.clear()
 }
 
 function touchLastUsed(apiKey: ApiKeyEntity): void {
@@ -34,8 +39,15 @@ export async function resolveApiKey(key: string | undefined): Promise<ApiKeyEnti
     return cached.apiKey
   }
 
+  const digest = hashApiKey(key)
+  const negativeUntil = negativeCache.get(digest)
+  if (negativeUntil !== undefined) {
+    if (negativeUntil > now) return null
+    negativeCache.delete(digest)
+  }
+
   const ds = await initDataSource()
-  const found = await ds.getRepository(ApiKeySchema).findOne({ where: { key: hashApiKey(key), enabled: true } })
+  const found = await ds.getRepository(ApiKeySchema).findOne({ where: { key: digest, enabled: true } })
   if (found) {
     cache.set(key, { apiKey: found, expiresAt: now + API_KEY_TTL_MS })
     touchLastUsed(found)
@@ -43,6 +55,8 @@ export async function resolveApiKey(key: string | undefined): Promise<ApiKeyEnti
   else {
     // 未命中（含被禁用）时清掉旧条目，避免残留
     cache.delete(key)
+    if (negativeCache.size >= NEGATIVE_MAX) negativeCache.clear()
+    negativeCache.set(digest, now + NEGATIVE_TTL_MS)
   }
   return found
 }

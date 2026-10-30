@@ -1,11 +1,11 @@
 import { initDataSource } from '../../../database/data-source'
 import { AlertChannelSchema, AlertRuleSchema, MetricSchema } from '../../../database/entities'
-import { requireAdmin } from '../../../utils/auth'
+import { requirePermission, requireSystemAccess } from '../../../utils/auth'
 import { firstZodMessage, alertRuleSchema } from '../../../utils/validation'
 import { recordAudit } from '../../../utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'alerts:manage')
   const parsed = alertRuleSchema.safeParse(await readBody(event))
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: firstZodMessage(parsed.error) })
@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
   if (!metric) {
     throw createError({ statusCode: 404, statusMessage: 'metric not found' })
   }
+  requireSystemAccess(admin, metric.systemId)
   const channel = await ds.getRepository(AlertChannelSchema).findOne({ where: { id: data.channelId } })
   if (!channel) {
     throw createError({ statusCode: 404, statusMessage: 'channel not found' })

@@ -28,8 +28,8 @@ export function stopMqttSubscriber(): void {
  * 主题格式：
  *   metric/{systemCode}/{metricCode}  payload 为 {"apiKey":"...","value":87.5,"timestamp":"可选"}
  *   ingest                            payload 为 {"apiKey":"...","systemCode","metricCode","value","timestamp"?}
- * payload 必须携带有效 ApiKey（与 HTTP/WS 通道一致），据此完成系统绑定隔离：
- * 通道内以 ApiKey 绑定的 systemId 校验 topic/payload 中的 systemCode，防止向任意系统写数据。
+ * payload 必须携带有效 ApiKey（与 HTTP/WS 通道一致），据此完成系统范围隔离：
+ * 通道内校验 ApiKey 的 data:write 与系统授权范围，防止向未授权系统写数据。
  * 断线自动重连（mqtt.js reconnectPeriod），坏消息只记日志不影响后续消息。
  */
 export function startMqttSubscriber(): void {
@@ -83,13 +83,17 @@ export function startMqttSubscriber(): void {
         }
 
         try {
-          // ApiKey 系统隔离：与 HTTP/WS 通道一致，凭 payload 中的 apiKey 解析出绑定系统
+          // ApiKey 系统隔离：与 HTTP/WS 通道一致，校验 data:write 与授权系统范围
           const apiKeyField = typeof raw === 'object' && raw !== null
             ? (raw as Record<string, unknown>).apiKey
             : undefined
           const apiKey = await resolveApiKey(typeof apiKeyField === 'string' ? apiKeyField : undefined)
           if (!apiKey) {
             console.warn(`[mqtt] missing or invalid api key on ${topic}`)
+            return
+          }
+          if (!apiKey.permissions.includes('data:write')) {
+            console.warn(`[mqtt] api key lacks data:write permission on ${topic}`)
             return
           }
 
@@ -108,7 +112,9 @@ export function startMqttSubscriber(): void {
             const { apiKey: _omit, ...rest } = payload as Record<string, unknown>
             payload = rest
           }
-          const result = await ingestData(payload, 'mqtt', { expectedSystemId: apiKey.systemId })
+          const result = await ingestData(payload, 'mqtt', {
+            allowedSystemIds: apiKey.allSystems ? undefined : apiKey.systemIds,
+          })
           console.log(`[mqtt] ingested ${topic} -> status=${result.status} recordId=${result.recordId}`)
         }
         catch (err) {

@@ -26,7 +26,7 @@
 <script setup lang="ts">
 // 基础按钮：variant primary/secondary/ghost/danger/link；size sm/md/lg；loading 内置 spinner 自动 disabled；
 // 默认 type="button"，表单提交需显式传 type="submit"。
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
   size?: 'sm' | 'md' | 'lg'
   type?: 'button' | 'submit'
@@ -41,18 +41,11 @@ const props = withDefaults(defineProps<{
   type: 'button',
 })
 
-const emit = defineEmits<{ click: [MouseEvent] }>()
-
 const attrs = computed(() => {
   const rest = { ...useAttrs() }
   delete rest.class
   return rest
 })
-
-function onClick(e: MouseEvent) {
-  if (props.disabled || props.loading) return
-  emit('click', e)
-}
 </script>
 
 <style lang="scss" scoped>
@@ -62,14 +55,23 @@ function onClick(e: MouseEvent) {
   justify-content: center;
   gap: $space-2;
   border: 1px solid transparent;
+  border-radius: $radius-md;
   font-size: $font-base;
+  font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+  user-select: none;
   transition: background-color $dur-fast $ease-out, border-color $dur-fast $ease-out,
-    color $dur-fast $ease-out, box-shadow $dur-fast $ease-out, opacity $dur-fast $ease-out;
+    color $dur-fast $ease-out, box-shadow $dur-fast $ease-out, opacity $dur-fast $ease-out,
+    transform $dur-fast $ease-out;
 
   @include focus-ring;
+
+  // 按下反馈：轻微下沉
+  &:active:not(:disabled) {
+    transform: translateY(1px) scale(0.98);
+  }
 
   &:disabled {
     opacity: 0.55;
@@ -86,6 +88,7 @@ function onClick(e: MouseEvent) {
 .container_uiButton_sm {
   height: $control-sm;
   padding: 0 $space-3;
+  border-radius: $radius-sm + 1;
   font-size: $font-xs;
 }
 
@@ -112,9 +115,11 @@ function onClick(e: MouseEvent) {
 .container_uiButton_primary {
   background: $color-primary;
   color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 
   &:hover:not(:disabled) {
     background: $color-primary-dark;
+    box-shadow: 0 4px 12px var(--tc-focus-ring);
   }
 }
 
@@ -132,7 +137,6 @@ function onClick(e: MouseEvent) {
 .container_uiButton_ghost {
   background: transparent;
   color: $color-text-secondary;
-  border-radius: $radius-md;
 
   &:hover:not(:disabled) {
     background: var(--tc-hover);
@@ -143,9 +147,11 @@ function onClick(e: MouseEvent) {
 .container_uiButton_danger {
   background: $color-danger;
   color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 
   &:hover:not(:disabled) {
     filter: brightness(0.92);
+    box-shadow: 0 4px 12px var(--tc-alarm-soft);
   }
 }
 
@@ -155,6 +161,11 @@ function onClick(e: MouseEvent) {
   padding-left: $space-1;
   padding-right: $space-1;
   color: $color-primary;
+  font-weight: 400;
+
+  &:active:not(:disabled) {
+    transform: none;
+  }
 
   &:hover:not(:disabled) {
     text-decoration: underline;

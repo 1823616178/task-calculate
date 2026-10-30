@@ -55,15 +55,33 @@ function goBack() {
 
   max-width: 420px;
   text-align: center;
+  border-radius: $radius-xl;
   box-shadow: var(--tc-shadow-2);
+  animation: tc-rise $dur-slow $ease-out both;
 }
 
 .container_errorPage_code {
   margin: 0;
-  font-size: $font-2xl;
-  font-weight: 700;
-  color: $color-primary;
-  line-height: 1.2;
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--tc-primary), var(--tc-primary-dark) 60%, var(--tc-text-secondary));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: container_errorPage_bob 3.2s ease-in-out infinite;
+}
+
+@keyframes container_errorPage_bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 .container_errorPage_title {

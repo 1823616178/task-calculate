@@ -10,7 +10,7 @@
       <span class="container_appUserMenu_avatar" aria-hidden="true">{{ initial }}</span>
       <span class="container_appUserMenu_name">{{ auth.user?.username }}</span>
       <span class="container_appUserMenu_role" :class="auth.isAdmin ? 'container_appUserMenu_role_admin' : ''">
-        {{ auth.user?.role }}
+        {{ auth.user?.authType === 'apiKey' ? 'ApiKey' : auth.user?.role }}
       </span>
       <svg
         class="container_appUserMenu_caret"
@@ -24,22 +24,28 @@
       </svg>
     </button>
 
+    <!-- 遮罩挂到 body：头部有 backdrop-filter，fixed 元素留在头部内只能覆盖头部区域；
+         挂出去后遮罩位于 sticky 头部（$z-sticky）之下，拦截对页面内容的误点 -->
     <Teleport to="body">
+      <Transition name="userMenu">
+        <div
+          v-if="open"
+          class="container_appUserMenu_mask"
+          @click.stop="close"
+        />
+      </Transition>
+    </Teleport>
+
+    <Transition name="userMenu">
       <div
         v-if="open"
-        class="container_appUserMenu_mask"
-        @click.stop="close"
-      />
-      <div
-        v-if="open"
-        ref="menuEl"
         class="container_appUserMenu_menu"
         role="menu"
         @keydown.esc.stop.prevent="close"
       >
         <div class="container_appUserMenu_head">
           <span class="container_appUserMenu_head_name">{{ auth.user?.username }}</span>
-          <UiBadge variant="primary" size="sm">{{ auth.user?.role === 'admin' ? '管理员' : '只读' }}</UiBadge>
+          <UiBadge variant="primary" size="sm">{{ auth.user?.authType === 'apiKey' ? 'ApiKey 登录' : (auth.user?.role === 'admin' ? '管理员' : '只读') }}</UiBadge>
         </div>
 
         <button type="button" role="menuitem" class="container_appUserMenu_item" @click="switchTheme">
@@ -54,7 +60,8 @@
           退出登录
         </button>
       </div>
-    </Teleport>
+    </Transition>
+
   </div>
 </template>
 
@@ -93,9 +100,6 @@ async function onLogout() {
 function onDocClick(e: MouseEvent) {
   if (!open.value) return
   if (rootEl.value?.contains(e.target as Node)) return
-  // 点击落在 Teleport 出去的菜单内部时不关闭
-  const target = e.target as HTMLElement
-  if (target.closest('.container_appUserMenu_menu')) return
   close()
 }
 
@@ -172,33 +176,38 @@ onBeforeUnmount(() => {
 .container_appUserMenu_mask {
   position: fixed;
   inset: 0;
-  z-index: $z-dropdown - 1;
+  z-index: $z-sticky - 1;
 }
 
 .container_appUserMenu_menu {
   position: absolute;
   top: calc(100% + #{$space-2});
   right: 0;
-  z-index: $z-dropdown;
+  z-index: 1;
   min-width: 180px;
   background: var(--tc-card-bg);
   border: 1px solid $color-border;
   border-radius: $radius-lg;
   box-shadow: var(--tc-shadow-2);
   padding: $space-2;
-  animation: container_appUserMenu_in $dur-fast $ease-out;
+  transform-origin: top right;
 }
 
-@keyframes container_appUserMenu_in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
+// 进出场：淡入 + 轻微下移/缩放
+.userMenu-enter-active,
+.userMenu-leave-active {
+  transition: opacity $dur-fast $ease-out, transform $dur-fast $ease-out;
+}
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.userMenu-enter-from,
+.userMenu-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+.container_appUserMenu_mask.userMenu-enter-from,
+.container_appUserMenu_mask.userMenu-leave-to {
+  transform: none;
 }
 
 .container_appUserMenu_head {

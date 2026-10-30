@@ -2,22 +2,21 @@ import { Readable } from 'node:stream'
 import { sendStream } from 'h3'
 import { initDataSource } from '../../database/data-source'
 import { MetricRecordSchema } from '../../database/entities'
-import { requireAuth } from '../../utils/auth'
+import { requireReadAccess, scopeReadQuery } from '../../utils/readAccess'
 import { csvLine } from '../../utils/csv'
 import { firstZodMessage, exportQuerySchema } from '../../utils/validation'
-
 
 const BATCH_SIZE = 1000
 
 // 历史记录导出 CSV：与 /api/records 相同的筛选参数，流式分批输出（上限 limit 条，默认 1 万）。
 // 带 BOM 头，Excel 打开中文不乱码。
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
+  const principal = await requireReadAccess(event)
   const parsed = exportQuerySchema.safeParse(getQuery(event))
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: firstZodMessage(parsed.error) })
   }
-  const { metricId, systemId, status, from, to, limit } = parsed.data
+  const { metricId, systemId, systemIds, status, from, to, limit } = await scopeReadQuery(principal, parsed.data)
 
   const ds = await initDataSource()
   const stamp = new Date().toISOString().slice(0, 19).replaceAll(/[-:T]/g, '')
@@ -44,6 +43,10 @@ export default defineEventHandler(async (event) => {
 
       if (metricId !== undefined) qb.andWhere('r.metricId = :metricId', { metricId })
       if (systemId !== undefined) qb.andWhere('m.systemId = :systemId', { systemId })
+      if (systemIds !== undefined) {
+        if (systemIds.length === 0) qb.andWhere('1 = 0')
+        else qb.andWhere('m.systemId IN (:...systemIds)', { systemIds })
+      }
       if (status !== undefined) qb.andWhere('r.status = :status', { status })
       if (from !== undefined) qb.andWhere('r.reportedAt >= :from', { from: new Date(from) })
       if (to !== undefined) qb.andWhere('r.reportedAt <= :to', { to: new Date(to) })

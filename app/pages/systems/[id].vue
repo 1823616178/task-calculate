@@ -3,17 +3,12 @@
     <AppBreadcrumb :items="breadcrumbItems" />
 
     <!-- 系统信息头卡 -->
-    <UiCard v-if="system" class="container_systemDetail_headCard">
-      <template #actions>
-        <div v-if="auth.isAdmin" class="container_systemDetail_headActions">
-          <UiButton variant="secondary" size="sm" @click="editVisible = true">编辑</UiButton>
-          <UiButton variant="primary" size="sm" @click="createMetricVisible = true">+ 新建指标</UiButton>
+    <section v-if="system" class="container_systemDetail_headCard" :class="`container_systemDetail_headCard_${worstStatus}`">
+      <div class="container_systemDetail_headMain">
+        <div class="container_systemDetail_headTitle">
+          <h1 class="container_systemDetail_name">{{ system.name }}</h1>
+          <code class="container_systemDetail_code">{{ system.code }}</code>
         </div>
-      </template>
-
-      <div class="container_systemDetail_headBody">
-        <h1 class="container_systemDetail_name">{{ system.name }}</h1>
-        <code class="container_systemDetail_code">{{ system.code }}</code>
         <p class="container_systemDetail_desc">{{ system.description || '暂无描述' }}</p>
         <div class="container_systemDetail_meta">
           <span>保留：{{ retentionText }}</span>
@@ -21,7 +16,25 @@
           <span>{{ metrics.length }} 个指标</span>
         </div>
       </div>
-    </UiCard>
+
+      <div class="container_systemDetail_headSide">
+        <div class="container_systemDetail_stats" aria-label="指标状态汇总">
+          <div
+            v-for="st in statusStats"
+            :key="st.key"
+            class="container_systemDetail_stat"
+            :class="[`container_systemDetail_stat_${st.key}`, { container_systemDetail_stat_zero: st.value === 0 }]"
+          >
+            <span class="container_systemDetail_statValue"><UiCountUp :value="st.value" /></span>
+            <span class="container_systemDetail_statLabel">{{ st.label }}</span>
+          </div>
+        </div>
+        <div v-if="auth.can('systems:manage') || auth.can('metrics:manage')" class="container_systemDetail_headActions">
+          <UiButton v-if="auth.can('systems:manage')" variant="secondary" size="sm" @click="editVisible = true">编辑</UiButton>
+          <UiButton v-if="auth.can('metrics:manage')" variant="primary" size="sm" @click="createMetricVisible = true">+ 新建指标</UiButton>
+        </div>
+      </div>
+    </section>
 
     <div
       v-else-if="dashboard.loading"
@@ -44,7 +57,7 @@
         <template #empty>
           <UiEmpty text="暂无指标" description="先创建指标，再通过 ApiKey / MQTT / HTTP 上报数据">
             <UiButton
-              v-if="auth.isAdmin && system"
+              v-if="auth.can('metrics:manage') && system"
               variant="primary"
               @click="createMetricVisible = true"
             >+ 新建指标</UiButton>
@@ -75,10 +88,16 @@
         </template>
 
         <template #cell_thresholds="{ row }">
-          <MetricThresholdBar :metric="(row as MetricDto)" />
+          <MetricThresholdBar
+            :value="row.lastValue"
+            :warn-min="row.warnMin"
+            :warn-max="row.warnMax"
+            :alarm-min="row.alarmMin"
+            :alarm-max="row.alarmMax"
+          />
         </template>
 
-        <template v-if="auth.isAdmin" #cell_actions="{ row }">
+        <template v-if="auth.can('metrics:manage')" #cell_actions="{ row }">
           <div class="container_systemDetail_rowActions">
             <UiButton variant="link" size="sm" @click="openEditMetric(row as MetricDto)">编辑</UiButton>
             <UiButton
@@ -93,13 +112,13 @@
     </section>
 
     <!-- 趋势：懒加载，首屏不引入 ECharts（约 570KB chunk） -->
-    <section v-if="tab === 'trend'" class="container_systemDetail_tabPanel">
+    <section v-if="tab === 'trend'" class="container_systemDetail_tabPanel container_systemDetail_tabPanel_card">
       <TrendChart :metrics="metrics" />
     </section>
 
     <!-- 告警规则 -->
     <section
-      v-if="auth.isAdmin && system && tab === 'alertRules'"
+      v-if="auth.can('alerts:manage') && system && tab === 'alertRules'"
       class="container_systemDetail_tabPanel container_systemDetail_tabPanel_card"
     >
       <AlertRuleManager :system-id="systemId" :metrics="metrics" />
@@ -107,18 +126,10 @@
 
     <!-- 静默窗口 -->
     <section
-      v-if="auth.isAdmin && system && tab === 'silences'"
+      v-if="auth.can('alerts:manage') && system && tab === 'silences'"
       class="container_systemDetail_tabPanel container_systemDetail_tabPanel_card"
     >
       <SilenceManager :system-id="systemId" :metrics="metrics" />
-    </section>
-
-    <!-- ApiKey -->
-    <section
-      v-if="auth.isAdmin && system && tab === 'apiKeys'"
-      class="container_systemDetail_tabPanel container_systemDetail_tabPanel_card"
-    >
-      <ApiKeyManager :system-id="systemId" />
     </section>
 
     <SystemFormModal
@@ -161,26 +172,24 @@ const systemId = Number(route.params.id)
 const system = computed(() => dashboard.systems.find((s) => s.id === systemId))
 const metrics = computed(() => system.value?.metrics ?? [])
 
+useHead({
+  title: computed(() => (system.value ? system.value.name : '系统详情')),
+})
+
 const breadcrumbItems = computed(() => [
   { label: '系统管理', to: '/systems' },
   { label: system.value ? `${system.value.name}（${system.value.code}）` : '系统详情' },
 ])
 
 // Tabs（viewer 只能看 指标/趋势）
-type TabKey = 'metrics' | 'trend' | 'alertRules' | 'silences' | 'apiKeys'
+type TabKey = 'metrics' | 'trend' | 'alertRules' | 'silences'
 
 const visibleTabs = computed(() => {
   const tabs: Array<{ key: TabKey, label: string, count?: number }> = [
     { key: 'metrics', label: '指标', count: metrics.value.length },
     { key: 'trend', label: '趋势' },
   ]
-  if (auth.isAdmin) {
-    tabs.push(
-      { key: 'alertRules', label: '告警规则' },
-      { key: 'silences', label: '静默窗口' },
-      { key: 'apiKeys', label: 'ApiKey' },
-    )
-  }
+  if (auth.can('alerts:manage')) tabs.push({ key: 'alertRules', label: '告警规则' }, { key: 'silences', label: '静默窗口' })
   return tabs
 })
 
@@ -193,7 +202,7 @@ watch(visibleTabs, (tabs) => {
 
 onMounted(() => {
   const q = typeof route.query.tab === 'string' ? route.query.tab : ''
-  if (['metrics', 'trend', 'alertRules', 'silences', 'apiKeys'].includes(q)) {
+  if (['metrics', 'trend', 'alertRules', 'silences'].includes(q)) {
     tab.value = q as TabKey
   }
   void dashboard.ensure()
@@ -213,6 +222,20 @@ function openEditMetric(m: MetricDto) {
   editMetricVisible.value = true
 }
 
+const worstStatus = computed<MetricStatus>(() => {
+  const order: Record<MetricStatus, number> = { alarm: 3, warning: 2, normal: 1, none: 0 }
+  return metrics.value.reduce<MetricStatus>((w, m) => (order[m.lastStatus] > order[w] ? m.lastStatus : w), 'none')
+})
+
+const statusStats = computed(() => {
+  const count = (st: MetricStatus) => metrics.value.filter((m) => m.lastStatus === st).length
+  return [
+    { key: 'normal', label: '正常', value: count('normal') },
+    { key: 'warning', label: '预警', value: count('warning') },
+    { key: 'alarm', label: '告警', value: count('alarm') },
+  ]
+})
+
 const retentionText = computed(() => {
   const sys = system.value
   if (!sys) return '—'
@@ -229,7 +252,7 @@ const metricColumns = computed<UiColumn[]>(() => {
     { key: 'code', label: '编码', width: '110px' },
     { key: 'name', label: '名称' },
   ]
-  if (auth.isAdmin) {
+  if (auth.can('metrics:manage')) {
     // 管理端把单位也并入名称列下方展示？保持原信息量：单位独立列
     cols.push({ key: 'unit', label: '单位', width: '80px' })
   }
@@ -239,7 +262,7 @@ const metricColumns = computed<UiColumn[]>(() => {
     { key: 'lastReportedAt', label: '上报时间', width: '120px' },
     { key: 'thresholds', label: '阈值区间', width: '220px' },
   )
-  if (auth.isAdmin) {
+  if (auth.can('metrics:manage')) {
     cols.push({ key: 'actions', label: '操作', width: '110px' })
   }
   return cols
@@ -271,7 +294,92 @@ async function deleteMetric(m: MetricDto) {
 }
 
 .container_systemDetail_headCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-4 $space-6;
+  flex-wrap: wrap;
   margin-bottom: $space-4;
+  padding: $space-5 $space-5 $space-5 $space-5 + 4;
+  background: $color-card-bg;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  box-shadow: var(--tc-shadow-1);
+  overflow: hidden;
+  animation: tc-rise $dur-slow $ease-out both;
+
+  // 左侧状态色条（与看板卡片一致）
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--tc-none);
+    transition: background-color $dur-base $ease-out;
+  }
+
+  &_normal::before { background: var(--tc-normal); }
+  &_warning::before { background: var(--tc-warning); }
+  &_alarm::before { background: var(--tc-alarm); }
+}
+
+.container_systemDetail_headMain {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  min-width: 0;
+}
+
+.container_systemDetail_headTitle {
+  display: flex;
+  align-items: center;
+  gap: $space-2 $space-3;
+  flex-wrap: wrap;
+}
+
+.container_systemDetail_headSide {
+  display: flex;
+  align-items: center;
+  gap: $space-5;
+  flex-wrap: wrap;
+}
+
+.container_systemDetail_stats {
+  display: flex;
+  gap: $space-2;
+}
+
+.container_systemDetail_stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  padding: $space-2 $space-3;
+  border-radius: $radius-md;
+  background: var(--tc-bg-subtle);
+
+  &_normal { color: var(--tc-normal); background: var(--tc-normal-soft); }
+  &_warning { color: var(--tc-warning); background: var(--tc-warning-soft); }
+  &_alarm { color: var(--tc-alarm); background: var(--tc-alarm-soft); }
+
+  &_zero {
+    color: $color-text-secondary;
+    background: var(--tc-bg-subtle);
+  }
+}
+
+.container_systemDetail_statValue {
+  font-size: $font-xl;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.container_systemDetail_statLabel {
+  font-size: $font-xs;
+  opacity: 0.85;
 }
 
 .container_systemDetail_headActions {
@@ -280,17 +388,10 @@ async function deleteMetric(m: MetricDto) {
   gap: $space-2;
 }
 
-.container_systemDetail_headBody {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: $space-2 $space-3;
-}
-
 .container_systemDetail_name {
   margin: 0;
-  font-size: $font-xl;
-  font-weight: 600;
+  font-size: $font-xl + 2;
+  font-weight: 650;
 }
 
 .container_systemDetail_code {
@@ -298,14 +399,12 @@ async function deleteMetric(m: MetricDto) {
 }
 
 .container_systemDetail_desc {
-  width: 100%;
   margin: 0;
   color: $color-text-secondary;
   font-size: $font-sm;
 }
 
 .container_systemDetail_meta {
-  width: 100%;
   display: flex;
   align-items: center;
   gap: $space-2;
@@ -321,14 +420,16 @@ async function deleteMetric(m: MetricDto) {
   margin-bottom: $space-4;
 }
 
+// Tab 切换：面板淡入上浮（v-show 从隐藏恢复显示时 CSS 动画会重新播放）
 .container_systemDetail_tabPanel {
   margin-top: $space-4;
+  animation: tc-rise $dur-slow $ease-out both;
 }
 
 .container_systemDetail_tabPanel_card {
   background: $color-card-bg;
   border: 1px solid $color-border;
-  border-radius: $radius-card;
+  border-radius: $radius-lg;
   padding: $space-4;
   box-shadow: var(--tc-shadow-1);
 }

@@ -16,6 +16,9 @@ export default defineNuxtConfig({
     { path: '~/components', pathPrefix: false },
   ],
   app: {
+    // 页面/布局切换过渡（prefers-reduced-motion 下由 global.scss 统一关闭）
+    pageTransition: { name: 'page', mode: 'out-in' },
+    layoutTransition: { name: 'layout', mode: 'out-in' },
     head: {
       // 首屏前应用本地主题，避免暗色模式闪烁（FOUC）
       script: [

@@ -61,19 +61,6 @@ const ICONS: Record<string, string> = {
   border: 1px solid $color-border;
   box-shadow: var(--tc-shadow-2);
   pointer-events: auto;
-  animation: container_uiToastHost_in $dur-base $ease-out;
-}
-
-@keyframes container_uiToastHost_in {
-  from {
-    opacity: 0;
-    transform: translateX(16px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 .container_uiToastHost_icon {
@@ -116,12 +103,28 @@ const ICONS: Record<string, string> = {
   }
 }
 
+.ui-toast-enter-active {
+  transition: opacity $dur-base $ease-out, transform $dur-base $ease-out;
+}
+
+.ui-toast-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+// 离场脱离文档流，配合 move 让下方 toast 平滑上移
 .ui-toast-leave-active {
+  position: absolute;
+  right: 0;
   transition: opacity $dur-fast ease, transform $dur-fast ease;
 }
 
 .ui-toast-leave-to {
   opacity: 0;
   transform: translateX(12px);
+}
+
+.ui-toast-move {
+  transition: transform $dur-base $ease-out;
 }
 </style>

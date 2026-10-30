@@ -1,9 +1,10 @@
 <template>
   <div class="container_users">
-    <div class="container_users_pageHead">
-      <h1 class="container_users_title">用户管理</h1>
-      <UiButton variant="primary" @click="openCreate">+ 新建用户</UiButton>
-    </div>
+    <UiPageHead title="用户管理" description="管理员可管理全部配置，只读用户仅可查看数据">
+      <template #actions>
+        <UiButton variant="primary" @click="openCreate">+ 新建用户</UiButton>
+      </template>
+    </UiPageHead>
 
     <UiTable
       :columns="columns"
@@ -15,8 +16,15 @@
       :row-class="(u) => (u.enabled ? '' : 'container_users_rowDisabled')"
     >
       <template #cell_username="{ row }">
-        {{ row.username }}
-        <UiTag v-if="row.id === currentUserId">当前用户</UiTag>
+        <span class="container_users_name">
+          <span
+            class="container_users_avatar"
+            :class="{ container_users_avatar_admin: row.role === 'admin' }"
+            aria-hidden="true"
+          >{{ row.username.slice(0, 1).toUpperCase() }}</span>
+          {{ row.username }}
+          <UiTag v-if="row.id === currentUserId">当前用户</UiTag>
+        </span>
       </template>
 
       <template #cell_role="{ row }">
@@ -26,10 +34,9 @@
       </template>
 
       <template #cell_enabled="{ row }">
-        <span
-          class="container_users_status"
-          :class="row.enabled ? 'container_users_status_on' : 'container_users_status_off'"
-        >{{ row.enabled ? '正常' : '已禁用' }}</span>
+        <UiBadge :variant="row.enabled ? 'normal' : 'alarm'" size="sm" dot>
+          {{ row.enabled ? '正常' : '已禁用' }}
+        </UiBadge>
       </template>
 
       <template #cell_createdAt="{ row }">
@@ -66,10 +73,11 @@
 </template>
 
 <script setup lang="ts">
+
+useHead({ title: '用户管理' })
 import type { UserDto } from '../types'
 import type { UiColumn } from '../components/ui/UiTable.vue'
 
-const auth = useAuthStore()
 const toast = useToast()
 
 definePageMeta({ middleware: 'admin' })
@@ -149,23 +157,41 @@ async function remove(u: UserDto) {
   padding: $space-5 $space-4 $space-6;
 }
 
-.container_users_pageHead {
-  display: flex;
+.container_users_name {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: $space-3;
-  margin-bottom: $space-4;
+  gap: $space-2;
+  font-weight: 500;
 }
 
-.container_users_title {
-  margin: 0;
-  font-size: $font-xl;
+.container_users_avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: $radius-pill;
+  background: var(--tc-hover);
+  color: $color-text-secondary;
+  font-size: $font-xs;
+  font-weight: 600;
+  flex-shrink: 0;
+
+  &_admin {
+    background: var(--tc-primary-soft);
+    color: $color-primary;
+  }
 }
 
-.container_users_status {
-  &_on { color: $color-normal; }
+.container_users_actions {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  white-space: nowrap;
+}
 
-  &_off { color: $color-danger; }
+.container_users_dangerLink {
+  color: $color-danger !important;
 }
 </style>
 

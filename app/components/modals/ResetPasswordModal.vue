@@ -105,7 +105,7 @@ async function submit() {
 }
 
 .container_resetPasswordModal_error {
-  margin: -4px 0 0;
+  margin: -$space-1 0 0;
   color: $color-danger;
   font-size: $font-xs;
 }

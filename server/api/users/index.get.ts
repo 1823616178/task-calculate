@@ -1,9 +1,9 @@
 import { initDataSource } from '../../database/data-source'
 import { UserSchema } from '../../database/entities'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission } from '../../utils/auth'
 
 export default defineEventHandler(async (event) => {
-  const user = requireAdmin(event)
+  const user = await requirePermission(event, 'users:manage')
   const ds = await initDataSource()
   const users = await ds.getRepository(UserSchema).find({ order: { id: 'ASC' } })
   return {
@@ -14,6 +14,6 @@ export default defineEventHandler(async (event) => {
       enabled: u.enabled,
       createdAt: u.createdAt,
     })),
-    currentUserId: user.userId,
+    currentUserId: user.kind === 'user' ? user.userId : null,
   }
 })

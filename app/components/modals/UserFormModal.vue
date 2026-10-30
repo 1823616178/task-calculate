@@ -152,7 +152,7 @@ async function submit() {
 .container_userFormModal_strengthSeg {
   height: 4px;
   flex: 0 0 28px;
-  border-radius: 999px;
+  border-radius: $radius-pill;
   background: var(--tc-hover);
 
   &_on:nth-child(1) { background: $color-danger; }

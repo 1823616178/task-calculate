@@ -201,7 +201,7 @@ async function submit() {
 }
 
 .container_silenceFormModal_error {
-  margin: -8px 0 0;
+  margin: -$space-2 0 0;
   color: $color-danger;
   font-size: $font-xs;
 }

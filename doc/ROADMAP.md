@@ -81,8 +81,8 @@
 ### 10. 部署交付物 ✅
 
 - **实现**：多阶段 Dockerfile（node:22-alpine，产物 + 生产 node_modules 合并解决 TypeORM 动态 require 驱动问题）；
-  docker-compose 增加 app 服务（depends_on healthcheck 门控）；HEALTHCHECK 接 `/api/health`；
-  GitHub Actions CI（npm ci → test → build）。
+  docker-compose 提供 app 服务（EMQX 改为宿主机系统服务，不再由 compose 管理）；HEALTHCHECK 接 `/api/health`；
+  GitHub Actions CI（npm ci → lint → typecheck → test → build，任一失败即阻断）。
 - **验证**：镜像构建成功；容器以 host 网络连宿主机 MySQL/EMQX 实测 health ok:true、登录/上报 200。
 
 ### 11. 审计日志 ✅
@@ -91,17 +91,17 @@
   （系统/指标/ApiKey 含轮换/用户/通知渠道含测试发送/规则/静默/保留清理）；
   `GET /api/audit` 分页查询（username 精确 + action 前缀 + 时间范围）；UI `/audit` 页。
 
-### 12. 界面体验 ◐ 部分
+### 12. 界面体验 ✅
 
 - **已完成**：暗色模式——颜色变量全面 CSS 化（`:root` / `html[data-theme='dark']`），
   首屏内联脚本防闪烁（FOUC），看板头部切换按钮，localStorage 持久化。
-- **待办**：移动端适配、alert/confirm 换 toast 组件。
+- **已完成（续）**：移动端适配（窄屏抽屉导航、表格横向滚动）；原生 alert/confirm/prompt 全部替换为 Toast / Confirm / Modal 体系（见 `doc/ui-refactor-plan.md`）。
 
 ---
 
 ## 技术债观察清单
 
-- `ingestData` 全管道无单测（需测试库或 DB mock，可评估 testcontainers）
+- `ingestData` 全管道已有 DB mock 单测（`tests/ingest.test.ts`）；仍缺真实 MySQL 下的 API 集成测试（可评估 testcontainers）
 - records 的偏移分页与游标分页并存，前端完全切到游标后可移除偏移路径
 - 登录限流/ApiKey 缓存/告警冷却为进程内存实现，多实例前需迁移 Redis（见第 9 项）
 - JWT 无刷新机制：过期即整体重登，长会话场景可加 refresh token；已签发 token 在有效期内无法强制踢出

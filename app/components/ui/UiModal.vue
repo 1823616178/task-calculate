@@ -145,6 +145,7 @@ const modal = useModal()
   justify-content: center;
   padding: 64px $space-4 $space-6;
   background: var(--tc-overlay);
+  backdrop-filter: blur(2px);
   overflow-y: auto;
 
   @include scrollbar;
@@ -199,9 +200,12 @@ const modal = useModal()
   color: $color-text-secondary;
   cursor: pointer;
 
+  transition: background-color $dur-fast $ease-out, color $dur-fast $ease-out, transform $dur-base $ease-out;
+
   &:hover {
     background: var(--tc-hover);
     color: $color-text;
+    transform: rotate(90deg);
   }
 }
 
@@ -234,8 +238,12 @@ const modal = useModal()
   transition: opacity $dur-base $ease-out;
 
   .container_uiModal_panel {
-    transition: transform $dur-base $ease-out, opacity $dur-base $ease-out;
+    transition: transform $dur-slow $ease-out, opacity $dur-base $ease-out;
   }
+}
+
+.ui-modal-leave-active .container_uiModal_panel {
+  transition-duration: $dur-base;
 }
 
 .ui-modal-enter-from,
@@ -243,7 +251,7 @@ const modal = useModal()
   opacity: 0;
 
   .container_uiModal_panel {
-    transform: translateY(12px) scale(0.985);
+    transform: translateY(16px) scale(0.97);
     opacity: 0;
   }
 }

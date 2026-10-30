@@ -1,12 +1,12 @@
 import bcrypt from 'bcryptjs'
 import { initDataSource } from '../../database/data-source'
 import { UserSchema } from '../../database/entities'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission } from '../../utils/auth'
 import { firstZodMessage, userCreateSchema } from '../../utils/validation'
 import { recordAudit } from '../../utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'users:manage')
   const parsed = userCreateSchema.safeParse(await readBody(event))
   if (!parsed.success) {
     throw createError({ statusCode: 400, statusMessage: firstZodMessage(parsed.error) })

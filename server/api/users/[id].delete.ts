@@ -1,16 +1,16 @@
 import { Not } from 'typeorm'
 import { initDataSource } from '../../database/data-source'
 import { UserSchema } from '../../database/entities'
-import { requireAdmin } from '../../utils/auth'
+import { requirePermission } from '../../utils/auth'
 import { recordAudit } from '../../utils/audit'
 
 export default defineEventHandler(async (event) => {
-  const admin = requireAdmin(event)
+  const admin = await requirePermission(event, 'users:manage')
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id) || id <= 0) {
     throw createError({ statusCode: 400, statusMessage: 'invalid id' })
   }
-  if (id === admin.userId) {
+  if (admin.kind === 'user' && id === admin.userId) {
     throw createError({ statusCode: 400, statusMessage: '不能删除当前登录用户' })
   }
 
