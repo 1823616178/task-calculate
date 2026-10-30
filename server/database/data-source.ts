@@ -7,6 +7,7 @@ import { AnalyticsOpsAudit1700000003000 } from './migrations/1700000003000-Analy
 import { HashApiKeys1700000004000 } from './migrations/1700000004000-HashApiKeys'
 import { ApiKeyScopes1700000005000 } from './migrations/1700000005000-ApiKeyScopes'
 import { GlobalApiKeys1700000006000 } from './migrations/1700000006000-GlobalApiKeys'
+import { AlertDeliveries1700000007000 } from './migrations/1700000007000-AlertDeliveries'
 
 // 缓存在 globalThis 上，避免 Nitro dev 模式 HMR 重复创建连接池
 const globalStore = globalThis as unknown as { __taskCalculateDs?: DataSource }
@@ -29,10 +30,18 @@ export function getDataSource(): DataSource {
         HashApiKeys1700000004000,
         ApiKeyScopes1700000005000,
         GlobalApiKeys1700000006000,
+        AlertDeliveries1700000007000,
       ],
       synchronize: false,
       logging: ['error'],
       charset: 'utf8mb4',
+      // 连接池显式可配（原来走 mysql2 默认）：高频上报 + 看板并发时按量调大，
+      // DB_POOL_SIZE 未配置时保持默认 10，避免无意中打满 MySQL。
+      extra: {
+        connectionLimit: Number(process.env.DB_POOL_SIZE || 10) || 10,
+        queueLimit: 0,
+        waitForConnections: true,
+      },
       // 与 MySQL 容器 TZ(Asia/Shanghai) 一致，datetime 存取统一按 +08:00
       timezone: '+08:00',
     })

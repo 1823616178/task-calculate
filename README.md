@@ -85,6 +85,8 @@ npm run typecheck # nuxt typecheck
 | POST | /api/auth/logout | - | 退出 |
 | GET | /api/auth/me | JWT | 当前用户 |
 | POST | /api/ingest | ApiKey | HTTP 接收通道 |
+| POST | /api/ingest/batch | ApiKey | HTTP 批量接收通道（数组，1–100 条；整批校验、按指标分组一笔事务写多条、每指标只广播/告警一次） |
+| GET | /api/records/summary | JWT | 历史记录状态分布（与 /api/records 同筛选口径，忽略 status 本身） |
 | GET | /api/health | - | DB / MQTT 健康检查 |
 | GET | /api/systems | JWT | 系统列表 + 状态汇总 + 指标（看板数据源） |
 | POST | /api/systems | admin | 新建系统 |
@@ -152,7 +154,8 @@ tests/          vitest 单测
 - 登录按 用户名+IP 限流，连续失败锁定 15 分钟；用户可被管理员禁用（登录拦截，保护最后一个可用管理员）
 - 看板 WS 认证走 httpOnly Cookie；断线指数退避重连（1s 起封顶 30s），会话过期停止重连并回登录页
 - 历史记录支持 keyset 游标分页（`beforeId`），深翻页不做 OFFSET 扫描
-- 告警通知失败重试 1 次后记日志；规则级冷却防通知风暴；静默窗口免打扰
+- 告警通知失败重试 1 次后记日志；规则级冷却防通知风暴；静默窗口免打扰；多渠道并行发送，每次发送结果写入 `alert_deliveries` 表（成功 / 失败 + 错误信息），不再只依赖进程日志
+- 看板 WebSocket 心跳：客户端每 30 秒 ping、服务端回 pong，75 秒无 pong 视为半开连接并重连
 - 数据保留：`RETENTION_DAYS` 全局默认 + 系统级 `retention_days` 覆盖（0=永久），每日 03:05 分批清理（LIMIT 5000 防长事务）
 - 管理操作全量审计（谁/何时/对什么/做了什么），用户名做快照不受删户影响
 - `GET /api/health` 暴露 DB / MQTT / WS 连接状态

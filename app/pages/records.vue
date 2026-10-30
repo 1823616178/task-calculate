@@ -80,6 +80,25 @@
       </div>
     </UiCard>
 
+    <!-- 状态分布：此前“指标”列是空白（UiTable 没有 metricName 插槽），且只能按当前页猜分布；
+         现在顶部给全量（同筛选口径）计数，点击可直接切状态筛选。 -->
+    <div v-if="summary" class="container_records_summary" role="group" aria-label="状态分布">
+      <button
+        v-for="item in summaryItems"
+        :key="item.key"
+        type="button"
+        class="container_records_summaryItem"
+        :class="[
+          `container_records_summaryItem_${item.key}`,
+          { container_records_summaryItem_active: filters.status === item.key },
+        ]"
+        @click="applyStatusFilter(item.key)"
+      >
+        <span class="container_records_summaryItemLabel">{{ item.label }}</span>
+        <span class="container_records_summaryItemValue">{{ item.value }}</span>
+      </button>
+    </div>
+
     <UiTable
       :columns="columns"
       :rows="records"
@@ -91,6 +110,10 @@
     >
       <template #cell_system="{ row }">
         {{ systemName(row.metric?.systemId) }}
+      </template>
+
+      <template #cell_metricName="{ row }">
+        {{ row.metric ? `${row.metric.name}（${row.metric.code}）` : '—' }}
       </template>
 
       <template #cell_value="{ row }">
@@ -139,6 +162,7 @@ onMounted(async () => {
   }
   await dashboard.ensure()
   await load()
+  await fetchSummary()
 })
 
 const QUICK_RANGES = [
@@ -180,6 +204,38 @@ const filters = reactive({
 
 const records = ref<RecordDto[]>([])
 const total = ref(0)
+const summary = ref<{ byStatus: Record<string, number>, total: number } | null>(null)
+
+const summaryItems = computed(() => {
+  const by = summary.value?.byStatus ?? {}
+  return [
+    { key: '' as '' | MetricStatus, label: '全部', value: summary.value?.total ?? 0 },
+    { key: 'normal' as MetricStatus, label: '正常', value: by.normal ?? 0 },
+    { key: 'warning' as MetricStatus, label: '预警', value: by.warning ?? 0 },
+    { key: 'alarm' as MetricStatus, label: '告警', value: by.alarm ?? 0 },
+    { key: 'none' as MetricStatus, label: '未判定', value: by.none ?? 0 },
+  ]
+})
+
+function applyStatusFilter(status: '' | MetricStatus): void {
+  filters.status = status
+  search()
+}
+
+async function fetchSummary(): Promise<void> {
+  try {
+    const query: Record<string, string | number> = {}
+    if (filters.systemId !== '') query.systemId = Number(filters.systemId)
+    if (filters.metricId !== '') query.metricId = Number(filters.metricId)
+    if (filters.from) query.from = new Date(filters.from).toISOString()
+    if (filters.to) query.to = new Date(filters.to).toISOString()
+    summary.value = await $fetch<{ byStatus: Record<string, number>, total: number }>('/api/records/summary', { query })
+  }
+  catch {
+    summary.value = null
+  }
+}
+
 const page = ref(1)
 const pageSizeNum = ref(20)
 const loading = ref(false)
@@ -309,6 +365,7 @@ function search() {
   currentCursor.value = null
   prevStack.value = []
   void load()
+  void fetchSummary()
 }
 
 async function onPageSizeChange(size: number) {
@@ -408,6 +465,47 @@ function resetFilters() {
 .container_records_filterCard {
   margin-bottom: $space-4;
   animation: tc-rise $dur-slow $ease-out 60ms both;
+}
+
+// 状态分布条：点击切筛选，当前选中态加底边高亮
+.container_records_summary {
+  display: flex;
+  gap: $space-2;
+  flex-wrap: wrap;
+  margin-bottom: $space-4;
+}
+
+.container_records_summaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-2 $space-3;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: $color-card-bg;
+  color: $color-text-secondary;
+  font-size: $font-sm;
+  cursor: pointer;
+  transition: border-color $dur-fast $ease-out, color $dur-fast $ease-out;
+
+  &:hover {
+    color: $color-text;
+  }
+
+  &_active {
+    border-color: $color-primary;
+    color: $color-primary;
+    font-weight: 600;
+  }
+
+  &_warning.container_records_summaryItem_active { border-color: var(--tc-warning); color: var(--tc-warning); }
+  &_alarm.container_records_summaryItem_active { border-color: $color-alarm; color: $color-alarm; }
+}
+
+.container_records_summaryItemValue {
+  font-weight: 700;
+
+  @include tabular-nums;
 }
 
 .container_records_filterBar {

@@ -46,7 +46,15 @@ vi.mock('../server/database/data-source', () => {
     if (schema === MetricRecordSchema) {
       return {
         create: (v: Record<string, unknown>) => v,
-        save: async (v: Record<string, unknown>) => {
+        save: async (v: Record<string, unknown> | Array<Record<string, unknown>>) => {
+          if (Array.isArray(v)) {
+            const saved = v.map((item) => {
+              const row = { ...item, id: db.records.length + 1 }
+              db.records.push(row)
+              return row
+            })
+            return saved
+          }
           const saved = { ...v, id: db.records.length + 1 }
           db.records.push(saved)
           return saved
@@ -75,7 +83,7 @@ const dispatch = vi.hoisted(() => vi.fn(async () => undefined))
 vi.mock('../server/services/broadcastService', () => ({ broadcastMetricUpdate: broadcast }))
 vi.mock('../server/services/alertingService', () => ({ dispatchAlertNotifications: dispatch }))
 
-const { clearMetricCache, ingestData, IngestError } = await import('../server/services/ingestService')
+const { clearMetricCache, ingestBatchData, ingestData, IngestError } = await import('../server/services/ingestService')
 const { clearApiKeyCache, resolveApiKey } = await import('../server/utils/apiKey')
 
 beforeEach(() => {
@@ -175,5 +183,36 @@ describe('resolveApiKey 负缓存', () => {
     clearApiKeyCache()
     expect(await resolveApiKey('dk_bad')).toBeNull()
     expect(db.apiKeyLookups).toBe(2)
+  })
+})
+
+describe('ingestBatchData', () => {
+  it('同一指标一批准入多条，last_* 只取最新一条，广播与告警各一次', async () => {
+    const result = await ingestBatchData([
+      { systemCode: 'line1', metricCode: 'temp', value: 50, timestamp: '2026-09-01T10:00:00Z' },
+      { systemCode: 'line1', metricCode: 'temp', value: 95, timestamp: '2026-09-01T10:01:00Z' },
+    ], 'http', { expectedSystemId: 1 })
+    expect(result.count).toBe(2)
+    expect(db.records).toHaveLength(2)
+    expect(db.metrics[0]!.lastValue).toBe(95)
+    expect(db.metrics[0]!.lastStatus).toBe('alarm')
+    expect(broadcast).toHaveBeenCalledTimes(1)
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    // 结果与输入顺序对应
+    expect(result.results.map(r => r.status)).toEqual(['normal', 'alarm'])
+  })
+
+  it('任一非法即整批拒绝，不写任何记录', async () => {
+    await expect(ingestBatchData([
+      { systemCode: 'line1', metricCode: 'temp', value: 50 },
+      { systemCode: 'line1', metricCode: 'temp', value: 'abc' },
+    ], 'http', { expectedSystemId: 1 })).rejects.toMatchObject({ statusCode: 400 })
+    expect(db.records).toHaveLength(0)
+  })
+
+  it('空数组与超限数组均拒绝', async () => {
+    await expect(ingestBatchData([], 'http', { expectedSystemId: 1 })).rejects.toMatchObject({ statusCode: 400 })
+    const many = Array.from({ length: 101 }, () => ({ systemCode: 'line1', metricCode: 'temp', value: 1 }))
+    await expect(ingestBatchData(many, 'http', { expectedSystemId: 1 })).rejects.toMatchObject({ statusCode: 400 })
   })
 })

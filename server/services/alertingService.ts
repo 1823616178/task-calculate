@@ -3,7 +3,7 @@ import { Brackets } from 'typeorm'
 import type { MetricStatus } from '../../shared/types'
 import { initDataSource } from '../database/data-source'
 import type { AlertChannelEntity, AlertRuleEntity, MetricEntity, SilenceRuleEntity } from '../database/entities'
-import { AlertRuleSchema, SilenceRuleSchema, SystemSchema } from '../database/entities'
+import { AlertDeliverySchema, AlertRuleSchema, SilenceRuleSchema, SystemSchema } from '../database/entities'
 
 // ---- 纯函数（可单测） ----
 
@@ -295,17 +295,43 @@ export async function dispatchAlertNotifications(input: AlertDispatchInput): Pro
     const matched = rules.filter(rule => rule.channel && ruleMatchesStatus(rule, newStatus))
     if (matched.length === 0) return
 
-    for (const rule of matched) {
-      if (isCoolingDown(rule.id, rule.cooldownSeconds)) continue
+    // 并行发送：原来逐个 await，渠道一多（或某个渠道超时 10s）会拖住后面的规则。
+    // 冷却仍按“成功才标记”：失败的规则下次跃迁仍可重试，且每次结果都落库。
+    const deliveryRepo = ds.getRepository(AlertDeliverySchema)
+    await Promise.allSettled(matched.map(async (rule) => {
+      if (isCoolingDown(rule.id, rule.cooldownSeconds)) return
+      const channel = rule.channel as AlertChannelEntity
       try {
-        await sendWithRetry(rule.channel as AlertChannelEntity, info)
+        await sendWithRetry(channel, info)
         markSent(rule.id)
-        console.log(`[alert] notified via "${(rule.channel as AlertChannelEntity).name}" (rule #${rule.id})`)
+        console.log(`[alert] notified via "${channel.name}" (rule #${rule.id})`)
+        await deliveryRepo.save(deliveryRepo.create({
+          ruleId: rule.id,
+          channelId: channel.id,
+          metricId: metric.id,
+          prevStatus,
+          newStatus,
+          value,
+          status: 'sent',
+          error: null,
+          reportedAt,
+        })).catch(() => undefined)
       }
       catch (err) {
         console.error(`[alert] send failed for rule #${rule.id}:`, err)
+        await deliveryRepo.save(deliveryRepo.create({
+          ruleId: rule.id,
+          channelId: channel.id,
+          metricId: metric.id,
+          prevStatus,
+          newStatus,
+          value,
+          status: 'failed',
+          error: String(err instanceof Error ? err.message : err).slice(0, 512),
+          reportedAt,
+        })).catch(() => undefined)
       }
-    }
+    }))
   }
   catch (err) {
     console.error('[alert] dispatch failed:', err)

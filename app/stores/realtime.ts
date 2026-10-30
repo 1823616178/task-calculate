@@ -9,6 +9,19 @@ let retryCount = 0
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 // 因认证失败（token 失效）被服务端拒绝时置位，停止自动重连
 let authFailed = false
+// 心跳：每 30s ping 一次，75s 内收不到 pong 视为半开连接，主动断开触发重连。
+// 原来只靠 close 事件，代理 / NAT 静默掐断后看板会一直显示“已连接”却收不到推送。
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+let lastPongAt = 0
+// 主动断开（退出登录）时置位，避免 onclose 又把重连定时器排回去。
+let intentionalClose = false
+
+function stopHeartbeat(): void {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
 
 export const useRealtimeStore = defineStore('realtime', {
   state: () => ({
@@ -25,6 +38,7 @@ export const useRealtimeStore = defineStore('realtime', {
       if (!auth.user) return
 
       authFailed = false
+      intentionalClose = false
       // 认证走同源握手自动携带的 httpOnly Cookie，token 不再拼进 URL（防泄漏进访问/代理日志）
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       const socket = new WebSocket(`${proto}://${location.host}/ws/dashboard`)
@@ -34,10 +48,25 @@ export const useRealtimeStore = defineStore('realtime', {
         retryCount = 0
         this.connected = true
         this.hadDisconnectToast = false
+        lastPongAt = Date.now()
+        stopHeartbeat()
+        heartbeatTimer = setInterval(() => {
+          if (socket.readyState !== WebSocket.OPEN) return
+          if (Date.now() - lastPongAt > 75_000) {
+            // 半开连接：不断不断、也不回 pong，主动断开走重连逻辑。
+            socket.close()
+            return
+          }
+          socket.send(JSON.stringify({ type: 'ping' }))
+        }, 30_000)
       }
       socket.onmessage = (event) => {
         try {
           const msg = JSON.parse(String(event.data)) as { type: string, code?: string, data?: MetricUpdateEvent['data'] }
+          if (msg.type === 'pong') {
+            lastPongAt = Date.now()
+            return
+          }
           if (msg.type === 'error' && msg.code === 'unauthorized') {
             // 会话已过期：停止重连并回到登录页
             authFailed = true
@@ -53,8 +82,13 @@ export const useRealtimeStore = defineStore('realtime', {
         }
       }
       socket.onclose = () => {
+        stopHeartbeat()
         if (ws === socket) ws = null
         this.connected = false
+        if (intentionalClose) {
+          intentionalClose = false
+          return
+        }
         if (authFailed) {
           void useAuthStore().logout()
           return
@@ -91,8 +125,10 @@ export const useRealtimeStore = defineStore('realtime', {
         clearTimeout(retryTimer)
         retryTimer = null
       }
+      stopHeartbeat()
       retryCount = 0
       authFailed = false
+      intentionalClose = true
       ws?.close()
       ws = null
       this.connected = false

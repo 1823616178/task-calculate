@@ -86,17 +86,23 @@ const RANGE_MS: Record<string, number> = {
   '7d': 7 * 86_400_000,
 }
 
-// 系列配色：从语义变量生成稳定色板（每个指标按 id 分配）
-const SERIES_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ef4444']
+// 系列配色：原来只有 6 色按 id 取模，指标超过 6 个必然撞色。
+// 改为 12 色、按亮 / 暗主题各一套（暗色用更亮的同色系，保证在深色底上可辨），
+// 仍按 id 取模保证同一指标在 chips 与折线上的颜色始终一致。
+const SERIES_COLORS_LIGHT = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#6366f1', '#a855f7']
+const SERIES_COLORS_DARK = ['#60a5fa', '#a78bfa', '#22d3ee', '#fbbf24', '#34d399', '#f87171', '#f472b6', '#a3e635', '#fb923c', '#2dd4bf', '#818cf8', '#c084fc']
+const SERIES_COLORS = SERIES_COLORS_LIGHT
+
+const theme = useTheme()
 
 function colorFor(metricId: number): string {
-  return SERIES_COLORS[metricId % SERIES_COLORS.length] ?? SERIES_COLORS[0]!
+  // 主题切换时 watch(theme) 会触发重绘，颜色随之切换。
+  const palette = theme.theme.value === 'dark' ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT
+  return palette[metricId % palette.length] ?? palette[0]!
 }
 
 const chartEl = ref<HTMLElement | null>(null)
 let chart: ReturnType<typeof echarts.init> | null = null
-
-const theme = useTheme()
 
 // ---- 修复点：原实现 ref 变量名 `window` 遮蔽全局 window，
 // 导致 onMounted 里 `window.addEventListener('resize')` 抛 TypeError、监听从未注册。
@@ -309,7 +315,7 @@ function render(results: SeriesResult[]) {
     animation: !themeRedraw,
     animationDuration: 600,
     animationEasing: 'cubicOut',
-    color: SERIES_COLORS,
+    color: theme.theme.value === 'dark' ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT,
     grid: { left: 48, right: 16, top: 32, bottom: 40 },
     legend: {
       top: 0,

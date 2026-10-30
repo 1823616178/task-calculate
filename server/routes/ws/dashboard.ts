@@ -47,6 +47,22 @@ export default defineWebSocketHandler({
     peer.close()
   },
 
+  // 心跳：客户端每 30s 发 {"type":"ping"}，服务端回 {"type":"pong"}。
+  // 原来没有任何心跳，代理 / NAT 静默掐断后的“半开连接”客户端察觉不到，
+  // 看板会一直显示“已连接”却收不到推送；现在靠 pong 超时触发重连。
+  message(peer, message) {
+    let text = ''
+    try {
+      text = message.text()
+    }
+    catch {
+      return
+    }
+    if (text === '{"type":"ping"}' || text === 'ping') {
+      peer.send(JSON.stringify({ type: 'pong' }))
+    }
+  },
+
   close(peer) {
     unregisterDashboardPeer(peer)
   },
